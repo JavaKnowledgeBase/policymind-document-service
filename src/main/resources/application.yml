@@ -1,0 +1,21 @@
+
+env_file:
+  - .env
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  redis:
+    host: localhost
+    port: 6379
+
+server:
+  port: 8080
+
+openai:
+ api-key: ${OPENAI_API_KEY}
