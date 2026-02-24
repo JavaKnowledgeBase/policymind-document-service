@@ -71,7 +71,7 @@ import com.policymind.document.repository.DocumentRepository;
 import lombok.RequiredArgsConstructor;
 
 @Service
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class DocumentService {
 
 	private final PdfService pdfService;
