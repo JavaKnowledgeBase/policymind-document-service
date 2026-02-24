@@ -9,7 +9,7 @@ import com.policymind.document.service.DocumentService;
 
 @RestController
 //@RequestMapping("/documents")
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class DocumentController {
 
     private final DocumentService documentService;
