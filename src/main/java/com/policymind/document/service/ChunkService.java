@@ -46,7 +46,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.*;
 
 @Service
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class ChunkService {
 	
 	private final DocumentChunkRepository chunkRepository;
