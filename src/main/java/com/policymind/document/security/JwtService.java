@@ -11,10 +11,10 @@ import java.util.Date;
 public class JwtService {
 	
 
-	    private final String SECRET = "VerySecretKeyForPolicyMindJWT1234567890";
+	    private static final String secretKey = "...";
 
 	    private Key getSignKey() {
-	        return Keys.hmacShaKeyFor(SECRET.getBytes());
+	        return Keys.hmacShaKeyFor(secretKey.getBytes());
 	    }
 
 	    public String generateToken(String username, String role) {

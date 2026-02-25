@@ -56,22 +56,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.policymind.document.entity.DocumentChunk;
+import com.policymind.document.exception.DocumentProcessingException;
 import com.policymind.document.model.Document;
 import com.policymind.document.repository.DocumentChunkRepository;
 import com.policymind.document.repository.DocumentRepository;
 
-import lombok.RequiredArgsConstructor;
 
 @Service
-//@RequiredArgsConstructor
 public class DocumentService {
 
 	private final PdfService pdfService;
@@ -119,7 +116,7 @@ public class DocumentService {
             return "Document uploaded and processed successfully.";
 
         } catch (Exception e) {
-            return "Processing failed: " + e.getMessage();
+        	throw new DocumentProcessingException("Failed to process document", e);
         }
     }
 

@@ -16,6 +16,8 @@
 
 package com.policymind.document.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -24,9 +26,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.policymind.document.dto.EmbeddingRequest;
+
 
 @Service
 public class EmbeddingService {
+	
+    	private static final Logger logger = LoggerFactory.getLogger(EmbeddingService.class);
 	
 	    @Value("${openai.api.key}")
 	    private String apiKey;
@@ -54,17 +62,23 @@ public class EmbeddingService {
 	        headers.setBearerAuth(apiKey);
 	        headers.setContentType(MediaType.APPLICATION_JSON);
 
-	        String body = """
-	        {
-	          "model": "text-embedding-3-small",
-	          "input": "%s"
-	        }
-	        """.formatted(text.replace("\"", "'"));
+	        ObjectMapper objectMapper = new ObjectMapper();
 
-	        HttpEntity<String> request = new HttpEntity<>(body, headers);
+	        EmbeddingRequest request =
+	                new EmbeddingRequest("text-embedding-3-small", text);
+
+	        String body = "";
+			try {
+				body = objectMapper.writeValueAsString(request);
+			} catch (JsonProcessingException e) {
+				logger.error("Failed to process request due to error", e);
+				//e.printStackTrace();
+			}
+
+	        HttpEntity<String> httpRequest = new HttpEntity<>(body, headers);
 
 	        ResponseEntity<String> response =
-	                restTemplate.postForEntity(url, request, String.class);
+	                restTemplate.postForEntity(url, httpRequest, String.class);
 
 	        return response.getBody();
 	    }

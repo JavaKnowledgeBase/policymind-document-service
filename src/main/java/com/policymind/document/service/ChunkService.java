@@ -41,12 +41,12 @@ import com.policymind.document.entity.DocumentChunk;
 import com.policymind.document.model.Document;
 import com.policymind.document.repository.DocumentChunkRepository;
 
-import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 @Service
-//@RequiredArgsConstructor
 public class ChunkService {
 	
 	private final DocumentChunkRepository chunkRepository;
@@ -57,6 +57,8 @@ public class ChunkService {
 		this.chunkRepository = chunkRepository;
 		this.embeddingService = new EmbeddingService();
 	}
+    
+    private static final Logger logger = LoggerFactory.getLogger(ChunkService.class);
 
 	public List<String> chunkText(String text) {
     	
@@ -66,7 +68,7 @@ public class ChunkService {
         for (int i = 0; i < text.length(); i += chunkSize) {
             chunks.add(text.substring(i, Math.min(text.length(), i + chunkSize)));
         }
-        System.out.println("Chunks created: " + chunks.size());
+        logger.info("Chunk processed successfully");
         return chunks;
     }
 	
