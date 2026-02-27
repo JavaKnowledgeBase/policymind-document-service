@@ -156,7 +156,7 @@ public class DocumentService {
             return "No chunks found for this document.";
         }
 
-        // 2️⃣ Embed question
+//        // 2️⃣ Embed question
         String questionEmbeddingJson =
                 embeddingService.generateEmbedding(question);
 

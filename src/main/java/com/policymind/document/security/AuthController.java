@@ -25,6 +25,7 @@ public class AuthController {
         // Temporary hardcoded user (replace with DB lookup later)
         String role = "USER";
 
+
         return jwtService.generateToken(username, role);
     }
 
