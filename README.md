@@ -63,6 +63,11 @@ To override, create `frontend/.env`:
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
+VITE_GOOGLE_AUTH_URL=
+VITE_MICROSOFT_AUTH_URL=
+VITE_FACEBOOK_AUTH_URL=
+VITE_LINKEDIN_AUTH_URL=
+VITE_TWITTER_AUTH_URL=
 ```
 
 ## Run with Docker
@@ -75,8 +80,7 @@ This starts:
 
 - PostgreSQL on `5432`
 - Backend on `8080`
-
-Note: frontend is not included in `docker-compose.yml` and should be run separately from `frontend/`.
+- Frontend on `5173`
 
 ## Current Frontend Pages
 
@@ -93,7 +97,7 @@ Note: frontend is not included in `docker-compose.yml` and should be run separat
 
 1. Configure root `.env`.
 2. Start backend (`mvn spring-boot:run` or `docker compose up --build`).
-3. Start frontend:
+3. If using local frontend:
 
 ```bash
 cd frontend

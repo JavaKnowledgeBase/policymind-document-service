@@ -42,6 +42,36 @@ p {
   margin-top: 8px;
 }
 
+.divider {
+  margin: 18px 0 14px;
+  position: relative;
+  text-align: center;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid #cbd5e1;
+  z-index: 0;
+}
+
+.divider span {
+  background: #ffffff;
+  padding: 0 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.social-grid {
+  display: grid;
+  gap: 10px;
+}
+
 input {
   width: 100%;
   padding: 10px 12px;
@@ -65,6 +95,30 @@ button {
   border: none;
   background: #0f766e;
   color: #ffffff;
+}
+
+.social-btn {
+  color: #ffffff;
+}
+
+.social-google {
+  background: #ea4335;
+}
+
+.social-microsoft {
+  background: #2563eb;
+}
+
+.social-facebook {
+  background: #1877f2;
+}
+
+.social-linkedin {
+  background: #0a66c2;
+}
+
+.social-twitter {
+  background: #0f172a;
 }
 
 button:disabled {

@@ -8,6 +8,18 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const socialProviders = [
+    { key: "google", label: "Continue with Google", url: import.meta.env.VITE_GOOGLE_AUTH_URL },
+    {
+      key: "microsoft",
+      label: "Continue with Microsoft",
+      url: import.meta.env.VITE_MICROSOFT_AUTH_URL
+    },
+    { key: "facebook", label: "Continue with Facebook", url: import.meta.env.VITE_FACEBOOK_AUTH_URL },
+    { key: "linkedin", label: "Continue with LinkedIn", url: import.meta.env.VITE_LINKEDIN_AUTH_URL },
+    { key: "twitter", label: "Continue with X (Twitter)", url: import.meta.env.VITE_TWITTER_AUTH_URL }
+  ];
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -31,6 +43,15 @@ export default function LoginPage() {
     }
   };
 
+  const handleSocialLogin = (providerName, authUrl) => {
+    setError("");
+    if (!authUrl) {
+      setError(`${providerName} login is not configured yet. Add its URL in frontend/.env.`);
+      return;
+    }
+    window.location.href = authUrl;
+  };
+
   return (
     <main className="page">
       <section className="card">
@@ -51,6 +72,23 @@ export default function LoginPage() {
             {isLoading ? "Signing in..." : "Login"}
           </button>
         </form>
+
+        <div className="divider" aria-hidden="true">
+          <span>or</span>
+        </div>
+
+        <div className="social-grid">
+          {socialProviders.map((provider) => (
+            <button
+              key={provider.key}
+              type="button"
+              className={`social-btn social-${provider.key}`}
+              onClick={() => handleSocialLogin(provider.label, provider.url)}
+            >
+              {provider.label}
+            </button>
+          ))}
+        </div>
 
         {error && <p className="error">{error}</p>}
       </section>
