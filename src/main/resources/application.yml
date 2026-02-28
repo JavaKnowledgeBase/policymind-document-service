@@ -17,8 +17,13 @@ spring:
 server:
   port: 8080
 
+logging:
+  file:
+    name: logs/policymind-document-service.log
+
 openai:
  api-key: ${OPENAI_API_KEY}
  
- jwt:
-   secret: ${JWT_SECRET}
+jwt:
+ #secret: policymind-production-super-secure-2026-jwt-key
+ secret: ${JWT_SECRET}
