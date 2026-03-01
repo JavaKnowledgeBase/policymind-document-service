@@ -13,6 +13,7 @@ import java.util.*;
 @Service
 public class ChunkService {
 
+    private static final int CHUNK_SIZE = 800;
     private final DocumentChunkRepository chunkRepository;
     private static final Logger logger = LoggerFactory.getLogger(ChunkService.class);
 
@@ -25,15 +26,18 @@ public class ChunkService {
     // ================================
     public List<String> chunkText(String text) {
 
-        int chunkSize = 800;
         List<String> chunks = new ArrayList<>();
 
-        for (int i = 0; i < text.length(); i += chunkSize) {
-            chunks.add(text.substring(i, Math.min(text.length(), i + chunkSize)));
+        for (int i = 0; i < text.length(); i += CHUNK_SIZE) {
+            chunks.add(text.substring(i, Math.min(text.length(), i + CHUNK_SIZE)));
         }
 
         logger.info("Chunk processed successfully");
         return chunks;
+    }
+
+    public int getChunkSize() {
+        return CHUNK_SIZE;
     }
 
     // ================================

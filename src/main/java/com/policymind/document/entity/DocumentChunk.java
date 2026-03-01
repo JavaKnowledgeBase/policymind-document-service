@@ -22,6 +22,10 @@ public class DocumentChunk {
 	    @Column(columnDefinition = "TEXT")
 	    private String embedding;  // store JSON vector temporarily
 
+        private Integer startLine;
+
+        private Integer endLine;
+
 
 		public Document getDocument() {
 			return document;
@@ -54,7 +58,21 @@ public class DocumentChunk {
 		public void setEmbedding(String embedding) {
 			this.embedding = embedding;
 		}
-	    
-	    
+
+        public Integer getStartLine() {
+            return startLine;
+        }
+
+        public void setStartLine(Integer startLine) {
+            this.startLine = startLine;
+        }
+
+        public Integer getEndLine() {
+            return endLine;
+        }
+
+        public void setEndLine(Integer endLine) {
+            this.endLine = endLine;
+        }
 
 }

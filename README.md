@@ -28,6 +28,18 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 OPENAI_API_KEY=your_openai_api_key
 JWT_SECRET=your_long_random_secret
+FRONTEND_OAUTH_CALLBACK_URL=http://localhost:5173/auth/callback
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+FACEBOOK_CLIENT_ID=
+FACEBOOK_CLIENT_SECRET=
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+TWITTER_CLIENT_ID=
+TWITTER_CLIENT_SECRET=
 ```
 
 ## Run Backend (Local)
@@ -70,6 +82,14 @@ VITE_LINKEDIN_AUTH_URL=
 VITE_TWITTER_AUTH_URL=
 ```
 
+If social URL variables are empty, frontend defaults to backend OAuth routes:
+
+- `/oauth2/authorization/google`
+- `/oauth2/authorization/microsoft`
+- `/oauth2/authorization/facebook`
+- `/oauth2/authorization/linkedin`
+- `/oauth2/authorization/twitter`
+
 ## Run with Docker
 
 ```bash
@@ -85,6 +105,8 @@ This starts:
 ## Current Frontend Pages
 
 - `/` - Login page
+- `/auth/callback` - OAuth callback token handoff
+- `/about` - Architecture overview and interview speaker notes
 - `/upload` - File upload page
 - `/error` - Error page
 
@@ -92,6 +114,24 @@ This starts:
 
 - `POST /auth/login?username=<name>`
 - `POST /upload` (multipart form-data with `file`)
+- `GET /oauth2/authorization/{provider}` (social login start)
+- `GET /login/oauth2/code/{provider}` (OAuth callback handled by Spring Security)
+
+## Third-Party OAuth Setup
+
+For each provider, create an app in the provider developer console and configure redirect URI:
+
+`http://localhost:8080/login/oauth2/code/{provider}`
+
+Examples:
+
+- Google: `.../google`
+- Microsoft: `.../microsoft`
+- Facebook: `.../facebook`
+- LinkedIn: `.../linkedin`
+- Twitter/X: `.../twitter`
+
+After updating `.env`, restart backend (or `docker compose up -d --build`).
 
 ## Quick Start
 

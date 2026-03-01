@@ -1,24 +1,51 @@
-﻿import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import client from "../api/client";
+import BrandBar from "../components/BrandBar";
+import DeveloperCredit from "../components/DeveloperCredit";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const location = useLocation();
   const navigate = useNavigate();
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
   const socialProviders = [
-    { key: "google", label: "Continue with Google", url: import.meta.env.VITE_GOOGLE_AUTH_URL },
+    {
+      key: "google",
+      label: "Continue with Google",
+      url: import.meta.env.VITE_GOOGLE_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/google`
+    },
     {
       key: "microsoft",
       label: "Continue with Microsoft",
-      url: import.meta.env.VITE_MICROSOFT_AUTH_URL
+      url: import.meta.env.VITE_MICROSOFT_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/microsoft`
     },
-    { key: "facebook", label: "Continue with Facebook", url: import.meta.env.VITE_FACEBOOK_AUTH_URL },
-    { key: "linkedin", label: "Continue with LinkedIn", url: import.meta.env.VITE_LINKEDIN_AUTH_URL },
-    { key: "twitter", label: "Continue with X (Twitter)", url: import.meta.env.VITE_TWITTER_AUTH_URL }
+    {
+      key: "facebook",
+      label: "Continue with Facebook",
+      url: import.meta.env.VITE_FACEBOOK_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/facebook`
+    },
+    {
+      key: "linkedin",
+      label: "Continue with LinkedIn",
+      url: import.meta.env.VITE_LINKEDIN_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/linkedin`
+    },
+    {
+      key: "twitter",
+      label: "Continue with X (Twitter)",
+      url: import.meta.env.VITE_TWITTER_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/twitter`
+    }
   ];
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("oauthError")) {
+      setError("OAuth login failed. Check provider credentials and callback settings.");
+    }
+  }, [location.search]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -54,44 +81,70 @@ export default function LoginPage() {
 
   return (
     <main className="page">
-      <section className="card">
-        <h1>PolicyMind Login</h1>
-        <p>Sign in to upload policy documents.</p>
+      <section className="card card-wide">
+        <BrandBar />
+        <div className="vision-shell">
+          <article className="vision-panel">
+            <p className="eyebrow">PolicyMind AI</p>
+            <h1>Understand Complex Policies and Contracts in Minutes</h1>
+            <p>
+              AI-powered policy intelligence platform built on microservices, RAG retrieval, vector search,
+              and secure cloud-ready architecture.
+            </p>
+            <ul className="feature-list">
+              <li>Simplifies legal and insurance language for faster decisions.</li>
+              <li>Highlights risk areas and clause-level insights for each document.</li>
+              <li>Supports growth from freemium users to enterprise agency workflows.</li>
+            </ul>
+          </article>
 
-        <form onSubmit={handleSubmit} className="form">
-          <label htmlFor="username">Username</label>
-          <input
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter username"
-            autoComplete="username"
-          />
+          <article className="login-panel">
+            <h2>Sign In</h2>
+            <p className="muted">Access upload, analysis, and risk insight workflows.</p>
 
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? "Signing in..." : "Login"}
-          </button>
-        </form>
+            <form onSubmit={handleSubmit} className="form">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+                autoComplete="username"
+              />
 
-        <div className="divider" aria-hidden="true">
-          <span>or</span>
+              <button type="submit" disabled={isLoading}>
+                {isLoading ? "Signing in..." : "Login"}
+              </button>
+            </form>
+
+            <div className="divider" aria-hidden="true">
+              <span>or</span>
+            </div>
+
+            <div className="social-grid">
+              {socialProviders.map((provider) => (
+                <button
+                  key={provider.key}
+                  type="button"
+                  className={`social-btn social-${provider.key}`}
+                  onClick={() => handleSocialLogin(provider.label, provider.url)}
+                >
+                  {provider.label}
+                </button>
+              ))}
+            </div>
+
+            {error && <p className="error">{error}</p>}
+
+          </article>
         </div>
-
-        <div className="social-grid">
-          {socialProviders.map((provider) => (
-            <button
-              key={provider.key}
-              type="button"
-              className={`social-btn social-${provider.key}`}
-              onClick={() => handleSocialLogin(provider.label, provider.url)}
-            >
-              {provider.label}
-            </button>
-          ))}
-        </div>
-
-        {error && <p className="error">{error}</p>}
       </section>
+      <div className="login-bottom-left">
+        <p>RAG + Explainability</p>
+        <p>JWT + Secure APIs</p>
+        <p>Redis + Vector Search</p>
+      </div>
+      <DeveloperCredit />
     </main>
   );
 }

@@ -1,7 +1,9 @@
-﻿import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import UploadPage from "./pages/UploadPage";
 import ErrorPage from "./pages/ErrorPage";
+import AboutArchitecturePage from "./pages/AboutArchitecturePage";
+import AuthCallbackPage from "./pages/AuthCallbackPage";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("authToken");
@@ -12,6 +14,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/about" element={<AboutArchitecturePage />} />
       <Route
         path="/upload"
         element={

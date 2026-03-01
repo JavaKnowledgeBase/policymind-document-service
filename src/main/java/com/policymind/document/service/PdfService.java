@@ -35,6 +35,12 @@ import java.io.IOException;
 
 @Service
 public class PdfService {
+	
+	private String status;
+
+	public String getStatus() { return status; }
+	public void setStatus(String status) { this.status = status; }
+
     public String extractText(MultipartFile file) throws IOException {
         PDDocument document = PDDocument.load(file.getInputStream());
         PDFTextStripper stripper = new PDFTextStripper();
