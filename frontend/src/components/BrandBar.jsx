@@ -1,3 +1,5 @@
+import HeaderTypeTicker from "./HeaderTypeTicker";
+
 export default function BrandBar() {
   return (
     <header className="brand-bar" aria-label="Torilaure Esystems brand">
@@ -29,6 +31,7 @@ export default function BrandBar() {
           </text>
         </svg>
       </div>
+      <HeaderTypeTicker />
     </header>
   );
 }

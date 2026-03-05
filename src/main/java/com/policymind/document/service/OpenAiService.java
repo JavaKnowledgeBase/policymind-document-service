@@ -92,9 +92,19 @@ public class OpenAiService {
 
             JsonNode parsed = objectMapper.readTree(content);
 
+            String summary = parsed.path("summary").asText("").trim();
+            if (summary.isBlank()) {
+                summary = "Summary not provided.";
+            }
+
+            String answer = parsed.path("answer").asText("").trim();
+            if (answer.isBlank()) {
+                answer = summary;
+            }
+
             Map<String, Object> output = new HashMap<>();
-            output.put("summary", parsed.path("summary").asText("Summary not provided."));
-            output.put("answer", parsed.path("answer").asText("Answer not provided."));
+            output.put("summary", summary);
+            output.put("answer", answer);
             output.put("risk_score", parsed.path("risk_score").asInt(5));
             output.put("confidence", parsed.path("confidence").asText("medium"));
 

@@ -95,6 +95,9 @@ gcp:
 app:
   oauth2:
     redirect-uri: ${FRONTEND_OAUTH_CALLBACK_URL:http://localhost:5173/auth/callback}
+  header-content:
+    csv-path: ${HEADER_CONTENT_CSV_PATH:resource_docs/contracts_policies_jokes.csv}
+    redis-key: ${HEADER_CONTENT_REDIS_KEY:policymind:header-content}
  
 jwt:
  #secret: policymind-production-super-secure-2026-jwt-key
