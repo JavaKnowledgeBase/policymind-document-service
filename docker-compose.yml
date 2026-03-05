@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   policymind:
-    build: .
+    image: 7nepalithito/policymind-document-service:latest
     container_name: policymind_ai
     env_file:
       - .env
@@ -32,10 +32,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_BASE_URL: http://localhost:8080
+    image: 7nepalithito/policymind-document-service-frontend:latest
     container_name: policymind_frontend
     ports:
       - "5173:80"
