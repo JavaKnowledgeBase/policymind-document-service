@@ -2,6 +2,9 @@ package com.policymind.document.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.auth.oauth2.AccessToken;
+import com.google.auth.oauth2.GoogleCredentials;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -121,39 +124,29 @@ public class VertexAiService {
     }
 
     private String resolveAccessToken() {
+        // Optional manual override (keep if you want emergency fallback)
         if (configuredBearerToken != null && !configuredBearerToken.isBlank()) {
             return configuredBearerToken.trim();
         }
 
         try {
-            HttpHeaders metadataHeaders = new HttpHeaders();
-            metadataHeaders.add("Metadata-Flavor", "Google");
-            HttpEntity<Void> request = new HttpEntity<>(metadataHeaders);
-            ResponseEntity<String> response = restTemplate.exchange(
-                    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
-                    HttpMethod.GET,
-                    request,
-                    String.class
-            );
-            JsonNode root = objectMapper.readTree(response.getBody());
-            String token = root.path("access_token").asText("");
-            if (!token.isBlank()) {
-                return token;
+            GoogleCredentials credentials = GoogleCredentials.getApplicationDefault()
+                    .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
+            credentials.refreshIfExpired();
+            AccessToken token = credentials.getAccessToken();
+            if (token != null && token.getTokenValue() != null && !token.getTokenValue().isBlank()) {
+                return token.getTokenValue();
             }
-        } catch (Exception ignored) {
-            logger.debug("Metadata server token lookup failed.");
-        }
-
-        String envToken = System.getenv("GCP_BEARER_TOKEN");
-        if (envToken != null && !envToken.isBlank()) {
-            return envToken.trim();
+        } catch (Exception e) {
+            logger.error("Failed to obtain ADC token for Vertex AI.", e);
         }
 
         throw new IllegalStateException(
-                "Vertex access token not found. Set gcp.bearer-token or GCP_BEARER_TOKEN, " +
-                        "or run this service with Workload Identity on GCP."
+                "Vertex access token not found via ADC. Configure GOOGLE_APPLICATION_CREDENTIALS " +
+                "or run on GCP with Workload Identity."
         );
     }
+
 
     private List<Double> extractEmbedding(String apiJson) {
         try {
@@ -223,4 +216,5 @@ public class VertexAiService {
         String withoutStart = trimmed.replaceFirst("^```[a-zA-Z]*\\s*", "");
         return withoutStart.replaceFirst("\\s*```$", "").trim();
     }
+    
 }
