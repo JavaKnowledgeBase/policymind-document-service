@@ -124,11 +124,13 @@ public class VertexAiService {
     }
 
     private String resolveAccessToken() {
-        // Optional manual override (keep if you want emergency fallback)
+        // Optional explicit override for emergencies
         if (configuredBearerToken != null && !configuredBearerToken.isBlank()) {
             return configuredBearerToken.trim();
         }
 
+        // Preferred path: ADC (works with GOOGLE_APPLICATION_CREDENTIALS on EC2
+        // and metadata identity on GCP)
         try {
             GoogleCredentials credentials = GoogleCredentials.getApplicationDefault()
                     .createScoped(List.of("https://www.googleapis.com/auth/cloud-platform"));
@@ -138,11 +140,17 @@ public class VertexAiService {
                 return token.getTokenValue();
             }
         } catch (Exception e) {
-            logger.error("Failed to obtain ADC token for Vertex AI.", e);
+            logger.error("Failed to obtain access token via ADC.", e);
+        }
+
+        // Backward-compatible fallback (optional)
+        String envToken = System.getenv("GCP_BEARER_TOKEN");
+        if (envToken != null && !envToken.isBlank()) {
+            return envToken.trim();
         }
 
         throw new IllegalStateException(
-                "Vertex access token not found via ADC. Configure GOOGLE_APPLICATION_CREDENTIALS " +
+                "Vertex access token not found. Configure GOOGLE_APPLICATION_CREDENTIALS " +
                 "or run on GCP with Workload Identity."
         );
     }
