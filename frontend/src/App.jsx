@@ -7,6 +7,7 @@ import ErrorPage from "./pages/ErrorPage";
 import AboutArchitecturePage from "./pages/AboutArchitecturePage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
 import FloatingMusicPlayer from "./components/FloatingMusicPlayer";
+import { useLocation } from "react-router-dom";
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem("authToken");
@@ -14,6 +15,9 @@ function ProtectedRoute({ children }) {
 }
 
 export default function App() {
+  const location = useLocation();
+  const hideMusicPlayer = ["/", "/register", "/reset-password", "/auth/callback"].includes(location.pathname);
+
   return (
     <>
       <Routes>
@@ -33,7 +37,7 @@ export default function App() {
         <Route path="/error" element={<ErrorPage />} />
         <Route path="*" element={<Navigate to="/error" replace />} />
       </Routes>
-      <FloatingMusicPlayer />
+      {!hideMusicPlayer && <FloatingMusicPlayer />}
     </>
   );
 }
