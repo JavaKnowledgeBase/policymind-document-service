@@ -7,6 +7,8 @@ import com.policymind.document.repository.DocumentChunkRepository;
 import com.policymind.document.repository.DocumentRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,6 +21,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class DocumentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
     private final PdfService pdfService;
     private final DocumentRepository repository;
@@ -51,17 +55,29 @@ public class DocumentService {
         }
 
         Document savedDoc = new Document();
+        String stage = "initialize";
 
         try {
+            stage = "persist document metadata";
             savedDoc.setFileName(file.getOriginalFilename());
             savedDoc.setStatus("PROCESSING");
             savedDoc.setCreatedAt(LocalDateTime.now());
             savedDoc = repository.save(savedDoc);
 
+            stage = "extract PDF text";
             String text = pdfService.extractText(file);
+            if (text == null || text.isBlank()) {
+                throw new IllegalStateException("No readable text extracted from the uploaded file.");
+            }
+
+            stage = "chunk extracted text";
             List<String> chunks = chunkService.chunkText(text);
+            if (chunks == null || chunks.isEmpty()) {
+                throw new IllegalStateException("No text chunks generated from extracted content.");
+            }
             List<LineRange> chunkLineRanges = buildChunkLineRanges(text, chunks, chunkService.getChunkSize());
 
+            stage = "generate embeddings and persist chunks";
             int chunkCount = 0;
             for (int idx = 0; idx < chunks.size(); idx++) {
                 String chunkText = chunks.get(idx);
@@ -78,6 +94,7 @@ public class DocumentService {
                 chunkCount++;
             }
 
+            stage = "mark document completed";
             savedDoc.setStatus("COMPLETED");
             repository.save(savedDoc);
 
@@ -89,9 +106,27 @@ public class DocumentService {
             response.put("chunksStored", chunkCount);
             return response;
         } catch (Exception e) {
-            savedDoc.setStatus("FAILED");
-            repository.save(savedDoc);
-            throw new DocumentProcessingException("Failed to process document", e);
+            logger.error(
+                    "Document processing failed at stage='{}', documentId='{}', file='{}'",
+                    stage,
+                    savedDoc.getId(),
+                    savedDoc.getFileName(),
+                    e
+            );
+
+            if (savedDoc.getId() != null) {
+                try {
+                    savedDoc.setStatus("FAILED");
+                    repository.save(savedDoc);
+                } catch (Exception statusEx) {
+                    logger.error("Failed to update document status to FAILED for id={}", savedDoc.getId(), statusEx);
+                }
+            }
+
+            throw new DocumentProcessingException(
+                    "Failed to process document at stage '" + stage + "': " + rootCauseMessage(e),
+                    e
+            );
         }
     }
 
@@ -312,5 +347,13 @@ public class DocumentService {
     }
 
     private record LineRange(int startLine, int endLine) {
+    }
+
+    private String rootCauseMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 }
