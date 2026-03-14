@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import client from "../api/client";
+import client, { API_BASE_URL } from "../api/client";
 import BrandBar from "../components/BrandBar";
 import DeveloperCredit from "../components/DeveloperCredit";
 
@@ -10,33 +10,32 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
   const socialProviders = [
     {
       key: "google",
       label: "Continue with Google",
-      url: import.meta.env.VITE_GOOGLE_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/google`
+      url: import.meta.env.VITE_GOOGLE_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/google`
     },
     {
       key: "microsoft",
       label: "Continue with Microsoft",
-      url: import.meta.env.VITE_MICROSOFT_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/microsoft`
+      url: import.meta.env.VITE_MICROSOFT_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/microsoft`
     },
     {
       key: "facebook",
       label: "Continue with Facebook",
-      url: import.meta.env.VITE_FACEBOOK_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/facebook`
+      url: import.meta.env.VITE_FACEBOOK_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/facebook`
     },
     {
       key: "linkedin",
       label: "Continue with LinkedIn",
-      url: import.meta.env.VITE_LINKEDIN_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/linkedin`
+      url: import.meta.env.VITE_LINKEDIN_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/linkedin`
     },
     {
       key: "twitter",
       label: "Continue with X (Twitter)",
-      url: import.meta.env.VITE_TWITTER_AUTH_URL || `${apiBaseUrl}/oauth2/authorization/twitter`
+      url: import.meta.env.VITE_TWITTER_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/twitter`
     }
   ];
 

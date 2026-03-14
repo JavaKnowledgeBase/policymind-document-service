@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { API_BASE_URL } from "../api/client";
 
 const TOTAL_WINDOW_MS = 20000;
 const TYPING_WINDOW_MS = 14000;
@@ -23,8 +24,7 @@ export default function HeaderTypeTicker() {
     let ignore = false;
     const loadItems = async () => {
       try {
-        const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-        const response = await fetch(`${apiBase}/content/header-lines`);
+        const response = await fetch(`${API_BASE_URL}/content/header-lines`);
         if (!response.ok) {
           return;
         }

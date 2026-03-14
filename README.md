@@ -92,6 +92,8 @@ If social URL variables are empty, frontend defaults to backend OAuth routes:
 
 ## Run with Docker
 
+For local development:
+
 ```bash
 docker compose up --build
 ```
@@ -99,8 +101,21 @@ docker compose up --build
 This starts:
 
 - PostgreSQL on `5432`
+- Redis on `6379`
 - Backend on `8080`
 - Frontend on `5173`
+
+For EC2-style production deployment with `.env.production` and mounted GCP credentials:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ec2.yml up --build -d
+```
+
+Notes:
+
+- Base compose uses `${COMPOSE_ENV_FILE:-.env}` by default, so local Docker runs work with your normal `.env`.
+- The EC2 override adds `.env.production` and mounts `./secrets/policymind-ai-80ed72ade163.json`.
+- If you do not need ADC credentials, the base compose file can run with `GCP_BEARER_TOKEN` instead.
 
 ## Current Frontend Pages
 
@@ -254,6 +269,36 @@ Symptoms:
 Fix:
 
 - Save JSON files (`package.json`, etc.) as UTF-8 without BOM.
+
+### 9) Backend startup seems hung or inconsistent
+
+Symptoms:
+
+- App takes a long time to come up
+- Startup fails intermittently
+- You suspect port conflicts, stale logs, or test/build noise
+
+Fix:
+
+- Run the local diagnostics script:
+  - one-time snapshot:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\diagnose-startup.ps1
+```
+
+  - live watch during startup:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\diagnose-startup.ps1 -Watch
+```
+
+- This checks:
+  - whether port `8080` is already in use
+  - recent `WARN`/`ERROR` lines from `logs/policymind-document-service.log`
+  - latest startup markers like `Started DocumentServiceApplication`
+  - failing Surefire test summaries from `target/surefire-reports`
+  - in watch mode, newly appended startup/error log lines every few seconds
 
 ## Health Checks
 

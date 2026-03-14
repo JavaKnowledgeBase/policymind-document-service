@@ -16,3 +16,9 @@ postgres_data/
 
 # Environment
 .env
+.env.production
+
+# Local diagnostics and credentials
+.tmp_diag.txt
+policymind-ai-80ed72ade163.json
+secrets/

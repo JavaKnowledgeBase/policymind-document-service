@@ -1,41 +1,71 @@
 services:
-
   postgres:
     image: postgres:15
     container_name: policymind_postgres
     env_file:
-      - .env
+      - ${COMPOSE_ENV_FILE:-.env}
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: policymind_redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+
   policymind:
-    image: 7nepalithito/policymind-document-service:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: policymind-backend:local
     container_name: policymind_ai
     env_file:
-      - .env
+      - ${COMPOSE_ENV_FILE:-.env}
     ports:
-      - "8080:8080"
+      - "${BACKEND_PORT:-8080}:8080"
     depends_on:
       - postgres
+      - redis
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_REDIS_PORT: 6379
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      SERVER_USE_FORWARD_HEADERS: "true"
+      SERVER_TOMCAT_REMOTEIP_PROTOCOL_HEADER: x-forwarded-proto
+      SERVER_TOMCAT_REMOTE_IP_HEADER: x-forwarded-for
+      AI_PROVIDER_EMBEDDING: ${AI_EMBEDDING_PROVIDER:-openai}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+      GCP_LOCATION: ${GCP_LOCATION:-us-central1}
+      GCP_VERTEX_EMBEDDING_MODEL: ${GCP_VERTEX_EMBEDDING_MODEL:-text-embedding-005}
+      GCP_VERTEX_CHAT_MODEL: ${GCP_VERTEX_CHAT_MODEL:-gemini-2.0-flash-lite-001}
+      GCP_BEARER_TOKEN: ${GCP_BEARER_TOKEN:-}
+      JWT_SECRET: ${JWT_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
     restart: unless-stopped
 
   frontend:
-    image: 7nepalithito/policymind-document-service-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    image: policymind-frontend:local
     container_name: policymind_frontend
     ports:
-      - "5173:80"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - policymind
     restart: unless-stopped

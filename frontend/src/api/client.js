@@ -1,9 +1,9 @@
-﻿import axios from "axios";
-baseURL: import.meta.env.VITE_API_BASE_URL || "/api"
+import axios from "axios";
 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"
+  baseURL: API_BASE_URL
 });
 
 client.interceptors.request.use((config) => {
