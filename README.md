@@ -125,6 +125,18 @@ This starts:
 - Backend on `8080`
 - Frontend on `5173`
 
+To mirror the EC2 Vertex setup locally, place your Google service-account JSON at:
+
+`C:\Users\rkafl\Documents\Projects\policymind-document-service\secrets\policymind-ai-80ed72ade163.json`
+
+The local compose file mounts that path into the backend container and sets:
+
+```env
+GOOGLE_APPLICATION_CREDENTIALS=/app/secrets/policymind-ai-80ed72ade163.json
+```
+
+That lets Vertex use the same ADC-based credential path locally and on EC2. Keep `secrets/` out of git.
+
 For EC2-style production deployment with `.env.production` and mounted GCP credentials:
 
 ```bash
@@ -134,6 +146,7 @@ docker compose -f docker-compose.yml -f docker-compose.ec2.yml up --build -d
 Notes:
 
 - Base compose uses `${COMPOSE_ENV_FILE:-.env}` by default, so local Docker runs work with your normal `.env`.
+- Base compose now also mounts `./secrets/policymind-ai-80ed72ade163.json` so local Vertex calls can use `GOOGLE_APPLICATION_CREDENTIALS` the same way EC2 does.
 - The EC2 override adds `.env.production` and mounts `./secrets/policymind-ai-80ed72ade163.json`.
 - If you do not need ADC credentials, the base compose file can run with `GCP_BEARER_TOKEN` instead.
 

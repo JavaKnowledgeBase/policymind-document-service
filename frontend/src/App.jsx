@@ -1,5 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import UploadPage from "./pages/UploadPage";
 import ErrorPage from "./pages/ErrorPage";
 import AboutArchitecturePage from "./pages/AboutArchitecturePage";
@@ -16,6 +18,8 @@ export default function App() {
     <>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/about" element={<AboutArchitecturePage />} />
         <Route
