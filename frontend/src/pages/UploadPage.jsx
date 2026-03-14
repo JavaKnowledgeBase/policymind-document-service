@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import BrandBar from "../components/BrandBar";
@@ -50,6 +50,7 @@ export default function UploadPage() {
   const [documentId, setDocumentId] = useState("");
   const [question, setQuestion] = useState("");
   const [answerData, setAnswerData] = useState(null);
+  const [documentStatus, setDocumentStatus] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [message, setMessage] = useState("");
@@ -84,11 +85,34 @@ export default function UploadPage() {
     navigate("/");
   };
 
+  const loadDocumentStatus = async (id) => {
+    const response = await client.get(`/documents/${id}`);
+    setDocumentStatus(response.data);
+  };
+
+  useEffect(() => {
+    if (!documentId || !documentStatus || !["QUEUED", "PROCESSING"].includes(documentStatus.status)) {
+      return undefined;
+    }
+
+    const pollStatus = async () => {
+      try {
+        await loadDocumentStatus(documentId);
+      } catch (err) {
+        // Keep the last known status visible and let the user retry manually if needed.
+      }
+    };
+
+    const intervalId = window.setInterval(pollStatus, 3000);
+    return () => window.clearInterval(intervalId);
+  }, [documentId, documentStatus]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage("");
     setError("");
     setAnswerData(null);
+    setDocumentStatus(null);
 
     if (!file) {
       setError("Please select a file.");
@@ -109,12 +133,17 @@ export default function UploadPage() {
       } else {
         const fileName = data?.fileName || "document";
         const documentId = data?.documentId ?? "N/A";
-        const chunksStored = data?.chunksStored ?? 0;
         if (data?.documentId) {
           setDocumentId(String(data.documentId));
         }
+        setDocumentStatus({
+          documentId: data?.documentId ?? null,
+          fileName,
+          status: data?.status || "QUEUED",
+          chunksStored: data?.chunksStored ?? 0
+        });
         setMessage(
-          `Uploaded ${fileName}. Document ID: ${documentId}. Chunks stored: ${chunksStored}.`
+          `Accepted ${fileName}. Document ID: ${documentId}. Processing continues in the background.`
         );
       }
     } catch (err) {
@@ -136,6 +165,11 @@ export default function UploadPage() {
 
     if (!question.trim()) {
       setError("Please enter a question.");
+      return;
+    }
+
+    if (documentStatus && documentStatus.status !== "COMPLETED") {
+      setError("Wait until processing is completed before asking questions.");
       return;
     }
 
@@ -200,6 +234,25 @@ export default function UploadPage() {
             {isAsking ? "Asking..." : "Ask PolicyMind"}
           </button>
         </form>
+
+        {!!documentStatus && (
+          <section className="rag-section">
+            <div className="rag-head">
+              <h2>Processing Status</h2>
+              <div className="rag-badges">
+                <span className="badge">Status: {documentStatus.status || "UNKNOWN"}</span>
+                <span className="badge">Chunks: {documentStatus.chunksStored ?? 0}</span>
+              </div>
+            </div>
+            <p><strong>Document ID:</strong> {documentStatus.documentId || documentId}</p>
+            <p><strong>File:</strong> {documentStatus.fileName || "document"}</p>
+            {documentStatus.completedAt && <p><strong>Completed:</strong> {documentStatus.completedAt}</p>}
+            {documentStatus.errorMessage && <p className="error"><strong>Processing Error:</strong> {documentStatus.errorMessage}</p>}
+            <button type="button" className="secondary" onClick={() => loadDocumentStatus(documentId)}>
+              Refresh Status
+            </button>
+          </section>
+        )}
 
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}

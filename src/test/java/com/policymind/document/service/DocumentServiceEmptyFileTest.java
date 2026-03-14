@@ -19,9 +19,6 @@ public class DocumentServiceEmptyFileTest {
     DocumentRepository repository;
 
     @Mock
-    ChunkService chunkService;
-
-    @Mock
     DocumentChunkRepository chunkRepository;
 
     @Mock
@@ -34,7 +31,10 @@ public class DocumentServiceEmptyFileTest {
     VertexAiService vertexAiService;
 
     @Mock
-    PdfService pdfService;
+    DocumentProcessingWorker documentProcessingWorker;
+
+    @Mock
+    DocumentProcessingPipeline documentProcessingPipeline;
 
     @InjectMocks
     DocumentService documentService;
@@ -44,5 +44,12 @@ public class DocumentServiceEmptyFileTest {
         MockMultipartFile empty = new MockMultipartFile("file","empty.pdf","application/pdf", new byte[0]);
 
         assertThrows(DocumentProcessingException.class, () -> documentService.processDocument(empty));
+    }
+
+    @Test
+    public void submitDocument_emptyFile_throws() {
+        MockMultipartFile empty = new MockMultipartFile("file","empty.pdf","application/pdf", new byte[0]);
+
+        assertThrows(DocumentProcessingException.class, () -> documentService.submitDocument(empty));
     }
 }

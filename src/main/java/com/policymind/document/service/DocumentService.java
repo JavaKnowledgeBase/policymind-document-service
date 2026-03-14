@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,29 +25,29 @@ public class DocumentService {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
 
-    private final PdfService pdfService;
     private final DocumentRepository repository;
-    private final ChunkService chunkService;
     private final DocumentChunkRepository chunkRepository;
     private final EmbeddingService embeddingService;
     private final OpenAiService openAiService;
     private final VertexAiService vertexAiService;
+    private final DocumentProcessingWorker documentProcessingWorker;
+    private final DocumentProcessingPipeline documentProcessingPipeline;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentService(DocumentRepository repository,
-                           ChunkService chunkService,
                            DocumentChunkRepository chunkRepository,
                            EmbeddingService embeddingService,
                            OpenAiService openAiService,
                            VertexAiService vertexAiService,
-                           PdfService pdfService) {
-        this.pdfService = pdfService;
+                           DocumentProcessingWorker documentProcessingWorker,
+                           DocumentProcessingPipeline documentProcessingPipeline) {
         this.repository = repository;
-        this.chunkService = chunkService;
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
         this.openAiService = openAiService;
         this.vertexAiService = vertexAiService;
+        this.documentProcessingWorker = documentProcessingWorker;
+        this.documentProcessingPipeline = documentProcessingPipeline;
     }
 
     public Map<String, Object> processDocument(MultipartFile file) {
@@ -54,80 +55,44 @@ public class DocumentService {
             throw new DocumentProcessingException("Uploaded file is empty.");
         }
 
-        Document savedDoc = new Document();
-        String stage = "initialize";
+        Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "PROCESSING");
+        return documentProcessingPipeline.processStoredDocument(savedDoc.getId(), savedDoc.getFileName(), readFileBytes(file));
+    }
 
-        try {
-            stage = "persist document metadata";
-            savedDoc.setFileName(file.getOriginalFilename());
-            savedDoc.setStatus("PROCESSING");
-            savedDoc.setCreatedAt(LocalDateTime.now());
-            savedDoc = repository.save(savedDoc);
-
-            stage = "extract PDF text";
-            String text = pdfService.extractText(file);
-            if (text == null || text.isBlank()) {
-                throw new IllegalStateException("No readable text extracted from the uploaded file.");
-            }
-
-            stage = "chunk extracted text";
-            List<String> chunks = chunkService.chunkText(text);
-            if (chunks == null || chunks.isEmpty()) {
-                throw new IllegalStateException("No text chunks generated from extracted content.");
-            }
-            List<LineRange> chunkLineRanges = buildChunkLineRanges(text, chunks, chunkService.getChunkSize());
-
-            stage = "generate embeddings and persist chunks";
-            int chunkCount = 0;
-            for (int idx = 0; idx < chunks.size(); idx++) {
-                String chunkText = chunks.get(idx);
-                List<Double> embeddingVector = embeddingService.generateEmbedding(chunkText);
-                LineRange lineRange = chunkLineRanges.get(idx);
-
-                DocumentChunk chunk = new DocumentChunk();
-                chunk.setDocument(savedDoc);
-                chunk.setContent(chunkText);
-                chunk.setEmbedding(embeddingService.serializeEmbedding(embeddingVector));
-                chunk.setStartLine(lineRange.startLine());
-                chunk.setEndLine(lineRange.endLine());
-                chunkRepository.save(chunk);
-                chunkCount++;
-            }
-
-            stage = "mark document completed";
-            savedDoc.setStatus("COMPLETED");
-            repository.save(savedDoc);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Document uploaded and processed successfully.");
-            response.put("documentId", savedDoc.getId());
-            response.put("fileName", savedDoc.getFileName());
-            response.put("status", savedDoc.getStatus());
-            response.put("chunksStored", chunkCount);
-            return response;
-        } catch (Exception e) {
-            logger.error(
-                    "Document processing failed at stage='{}', documentId='{}', file='{}'",
-                    stage,
-                    savedDoc.getId(),
-                    savedDoc.getFileName(),
-                    e
-            );
-
-            if (savedDoc.getId() != null) {
-                try {
-                    savedDoc.setStatus("FAILED");
-                    repository.save(savedDoc);
-                } catch (Exception statusEx) {
-                    logger.error("Failed to update document status to FAILED for id={}", savedDoc.getId(), statusEx);
-                }
-            }
-
-            throw new DocumentProcessingException(
-                    "Failed to process document at stage '" + stage + "': " + rootCauseMessage(e),
-                    e
-            );
+    public Map<String, Object> submitDocument(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new DocumentProcessingException("Uploaded file is empty.");
         }
+
+        Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "QUEUED");
+        logger.info("Document accepted for async processing, documentId={}, file={}", savedDoc.getId(), savedDoc.getFileName());
+        documentProcessingWorker.processDocumentAsync(savedDoc.getId(), savedDoc.getFileName(), readFileBytes(file));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Document accepted for processing.");
+        response.put("documentId", savedDoc.getId());
+        response.put("fileName", savedDoc.getFileName());
+        response.put("status", savedDoc.getStatus());
+        response.put("statusUrl", "/documents/" + savedDoc.getId());
+        return response;
+    }
+
+    public Map<String, Object> getDocumentStatus(Long documentId) {
+        Document document = repository.findById(documentId)
+                .orElseThrow(() -> new DocumentProcessingException("Document not found: " + documentId));
+        long chunksStored = chunkRepository.countByDocumentId(documentId);
+        logger.debug("Document status requested, documentId={}, status={}, chunksStored={}", documentId, document.getStatus(), chunksStored);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("documentId", document.getId());
+        response.put("fileName", document.getFileName());
+        response.put("status", document.getStatus());
+        response.put("createdAt", document.getCreatedAt());
+        response.put("updatedAt", document.getUpdatedAt());
+        response.put("completedAt", document.getCompletedAt());
+        response.put("errorMessage", document.getErrorMessage());
+        response.put("chunksStored", chunksStored);
+        return response;
     }
 
     public Map<String, Object> askQuestion(Long documentId, String question, String embeddingProvider, String answerProvider) {
@@ -294,40 +259,6 @@ public class DocumentService {
         return "Lines " + startLine + "-" + endLine;
     }
 
-    private List<LineRange> buildChunkLineRanges(String fullText, List<String> chunks, int chunkSize) {
-        List<LineRange> ranges = new ArrayList<>();
-        int offset = 0;
-
-        for (String chunk : chunks) {
-            int safeChunkSize = chunk == null ? 0 : chunk.length();
-            int startOffset = Math.min(offset, fullText.length());
-            int endOffset = Math.min(fullText.length(), startOffset + Math.max(safeChunkSize, 0));
-
-            int startLine = lineNumberAtOffset(fullText, startOffset);
-            int endLine = lineNumberAtOffset(fullText, Math.max(startOffset, endOffset));
-            ranges.add(new LineRange(startLine, Math.max(startLine, endLine)));
-
-            offset += Math.min(chunkSize, Math.max(safeChunkSize, 0));
-        }
-
-        return ranges;
-    }
-
-    private int lineNumberAtOffset(String text, int offsetExclusive) {
-        if (text == null || text.isEmpty()) {
-            return 1;
-        }
-
-        int line = 1;
-        int safeOffset = Math.min(Math.max(offsetExclusive, 0), text.length());
-        for (int i = 0; i < safeOffset; i++) {
-            if (text.charAt(i) == '\n') {
-                line++;
-            }
-        }
-        return line;
-    }
-
     private String normalizeEmbeddingProvider(String provider) {
         if (provider == null || provider.isBlank()) {
             return "openai";
@@ -346,14 +277,22 @@ public class DocumentService {
         return "openai";
     }
 
-    private record LineRange(int startLine, int endLine) {
+    private Document createProcessingDocument(String fileName, String status) {
+        Document document = new Document();
+        document.setFileName(fileName);
+        document.setStatus(status);
+        document.setCreatedAt(LocalDateTime.now());
+        document.setUpdatedAt(LocalDateTime.now());
+        Document savedDocument = repository.save(document);
+        logger.info("Document record created, documentId={}, file={}, status={}", savedDocument.getId(), savedDocument.getFileName(), savedDocument.getStatus());
+        return savedDocument;
     }
 
-    private String rootCauseMessage(Throwable throwable) {
-        Throwable current = throwable;
-        while (current.getCause() != null) {
-            current = current.getCause();
+    private byte[] readFileBytes(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new DocumentProcessingException("Failed to read uploaded file bytes.", e);
         }
-        return current.getMessage() == null ? current.getClass().getSimpleName() : current.getMessage();
     }
 }

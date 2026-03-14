@@ -31,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.web.multipart.MultipartFile;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 @Service
@@ -42,7 +43,11 @@ public class PdfService {
 	public void setStatus(String status) { this.status = status; }
 
     public String extractText(MultipartFile file) throws IOException {
-        PDDocument document = PDDocument.load(file.getInputStream());
+        return extractText(file.getBytes());
+    }
+
+    public String extractText(byte[] fileBytes) throws IOException {
+        PDDocument document = PDDocument.load(new ByteArrayInputStream(fileBytes));
         PDFTextStripper stripper = new PDFTextStripper();
         String text = stripper.getText(document);
         document.close();

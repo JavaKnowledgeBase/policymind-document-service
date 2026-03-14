@@ -15,6 +15,10 @@ public class Document {
     private String fileName;
     private String status;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime completedAt;
+    @Column(columnDefinition = "TEXT")
+    private String errorMessage;
     
     
 	public Long getId() {
@@ -40,6 +44,24 @@ public class Document {
 	}
 	public void setCreatedAt(LocalDateTime createdAt) {
 		this.createdAt = createdAt;
+	}
+	public LocalDateTime getUpdatedAt() {
+		return updatedAt;
+	}
+	public void setUpdatedAt(LocalDateTime updatedAt) {
+		this.updatedAt = updatedAt;
+	}
+	public LocalDateTime getCompletedAt() {
+		return completedAt;
+	}
+	public void setCompletedAt(LocalDateTime completedAt) {
+		this.completedAt = completedAt;
+	}
+	public String getErrorMessage() {
+		return errorMessage;
+	}
+	public void setErrorMessage(String errorMessage) {
+		this.errorMessage = errorMessage;
 	}
     
     

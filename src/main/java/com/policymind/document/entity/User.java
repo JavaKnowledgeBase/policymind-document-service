@@ -28,6 +28,8 @@ public class User {
 
 	    private String username;
 	    private String password;
+        private String securityQuestion;
+        private String securityAnswerHash;
 
 	    @Enumerated(EnumType.STRING)
 	    private Role role;
@@ -63,6 +65,22 @@ public class User {
 		public void setRole(Role role) {
 			this.role = role;
 		}
+
+        public String getSecurityQuestion() {
+            return securityQuestion;
+        }
+
+        public void setSecurityQuestion(String securityQuestion) {
+            this.securityQuestion = securityQuestion;
+        }
+
+        public String getSecurityAnswerHash() {
+            return securityAnswerHash;
+        }
+
+        public void setSecurityAnswerHash(String securityAnswerHash) {
+            this.securityAnswerHash = securityAnswerHash;
+        }
 	    
 	    
 

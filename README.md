@@ -58,6 +58,26 @@ Backend logs are written to:
 
 - `logs/policymind-document-service.log` (relative to repository root)
 
+## Run Backend Tests
+
+Use the repo-local helper so Maven dependencies and PDFBox font cache stay inside the workspace:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-tests.ps1
+```
+
+To run only a focused subset of tests:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-tests.ps1 -Test "DocumentServiceTest,AuthServiceTest"
+```
+
+Notes:
+
+- the helper uses the checked-in Maven path at `.tools/apache-maven-3.9.9`
+- dependencies are cached under `.m2/repository`
+- PDFBox font cache is redirected to `.pdfbox-cache` to avoid profile-directory permission issues
+
 ## Run Frontend (Local)
 
 From `frontend/`:
@@ -299,6 +319,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\diagnose-startup.ps1 -Watch
   - latest startup markers like `Started DocumentServiceApplication`
   - failing Surefire test summaries from `target/surefire-reports`
   - in watch mode, newly appended startup/error log lines every few seconds
+
+### 10) EC2 build/deploy visibility
+
+Use the EC2 deploy helper to stream build output live, save a deploy log on the server, and optionally follow container logs after the stack comes up.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1
+```
+
+To keep following container logs after deploy:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1 -FollowLogs
+```
+
+What it does:
+
+- backs up `.env.production` and `secrets/` on the EC2 host
+- hard-resets the repo to `origin/main`
+- runs `docker-compose ... up --build -d` with live output
+- saves the full deploy output to `/home/ec2-user/policymind-deploy-<timestamp>.log`
+- optionally tails live compose logs after deployment
 
 ## Health Checks
 

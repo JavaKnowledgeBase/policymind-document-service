@@ -43,6 +43,8 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
             User user = new User();
             user.setUsername(username);
             user.setPassword(null);
+            user.setSecurityQuestion(null);
+            user.setSecurityAnswerHash(null);
             user.setRole(Role.USER);
             return userRepository.save(user);
         });

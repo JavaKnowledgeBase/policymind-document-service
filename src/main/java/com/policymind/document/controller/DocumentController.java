@@ -3,28 +3,31 @@ package com.policymind.document.controller;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.multipart.MultipartFile;
 import com.policymind.document.service.DocumentService;
 
 import java.util.Map;
 
 @RestController
-//@RequestMapping("/documents")
 public class DocumentController {
 
     private final DocumentService documentService;
-    
-    
 
     public DocumentController(DocumentService documentService) {
 		this.documentService = documentService;
 	}
 
-
-
+	// Upload returns immediately and lets the worker finish parsing/chunking/embedding in the background.
 	@PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(documentService.processDocument(file));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(documentService.submitDocument(file));
+    }
+
+    // This gives the UI a polling-friendly status endpoint ahead of a full worker/service split.
+    @GetMapping("/documents/{id}")
+    public ResponseEntity<Map<String, Object>> getDocumentStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(documentService.getDocumentStatus(id));
     }
 	
 	@PostMapping("/{id}/ask")

@@ -24,9 +24,6 @@ public class DocumentServiceTest {
     DocumentRepository documentRepository;
 
     @Mock
-    ChunkService chunkService;
-
-    @Mock
     DocumentChunkRepository chunkRepository;
 
     @Mock
@@ -39,7 +36,10 @@ public class DocumentServiceTest {
     VertexAiService vertexAiService;
 
     @Mock
-    PdfService pdfService;
+    DocumentProcessingWorker documentProcessingWorker;
+
+    @Mock
+    DocumentProcessingPipeline documentProcessingPipeline;
 
     @InjectMocks
     DocumentService documentService;
@@ -87,5 +87,23 @@ public class DocumentServiceTest {
 
         Map<String, Object> providers = (Map<String, Object>) resp.get("providers");
         assertTrue(providers.containsKey("openai"));
+    }
+
+    @Test
+    public void getDocumentStatus_returnsStatusPayload() {
+        Document document = new Document();
+        document.setId(5L);
+        document.setFileName("policy.pdf");
+        document.setStatus("PROCESSING");
+
+        when(documentRepository.findById(5L)).thenReturn(java.util.Optional.of(document));
+        when(chunkRepository.countByDocumentId(5L)).thenReturn(2L);
+
+        Map<String, Object> response = documentService.getDocumentStatus(5L);
+
+        assertEquals(5L, response.get("documentId"));
+        assertEquals("policy.pdf", response.get("fileName"));
+        assertEquals("PROCESSING", response.get("status"));
+        assertEquals(2L, response.get("chunksStored"));
     }
 }

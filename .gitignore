@@ -1,6 +1,9 @@
 # Maven
 target/
 *.log
+.m2/
+.tools/
+.pdfbox-cache/
 
 # IDE
 .idea/
