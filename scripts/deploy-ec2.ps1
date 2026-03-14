@@ -1,8 +1,9 @@
 param(
-    [string]$Host = "ec2-user@3.128.197.215",
+    [string]$RemoteHost = "ec2-user@3.128.197.215",
     [string]$KeyPath = "C:\Users\rkafl\Documents\Projects\policymind-key.pem",
     [string]$RepoPath = "/home/ec2-user/policymind-src",
     [string]$Branch = "main",
+    [string]$ComposeFile = "docker-compose.aws.yml",
     [switch]$SkipGitSync,
     [switch]$FollowLogs,
     [int]$TailLines = 120
@@ -19,16 +20,17 @@ function Write-Section {
 function Invoke-RemoteCommand {
     param([string]$RemoteCommand)
 
-    & ssh -i $KeyPath $Host $RemoteCommand
+    & ssh -i $KeyPath $RemoteHost $RemoteCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Remote command failed with exit code $LASTEXITCODE"
     }
 }
 
 Write-Section "EC2 Deploy"
-Write-Host "Host: $Host"
+Write-Host "Host: $RemoteHost"
 Write-Host "Repo: $RepoPath"
 Write-Host "Branch: $Branch"
+Write-Host "Compose file: $ComposeFile"
 
 if (-not $SkipGitSync) {
     Write-Section "Git Sync"
@@ -55,20 +57,21 @@ set -e
 cd REPO_PATH
 deploy_log=/home/ec2-user/policymind-deploy-$(date +%Y%m%d-%H%M%S).log
 echo "Deploy log: $deploy_log"
-docker-compose -f docker-compose.yml -f docker-compose.ec2.yml config 2>&1 | tee -a "$deploy_log"
-docker-compose -f docker-compose.yml -f docker-compose.ec2.yml up --build -d 2>&1 | tee -a "$deploy_log"
-docker-compose -f docker-compose.yml -f docker-compose.ec2.yml ps 2>&1 | tee -a "$deploy_log"
+docker-compose -f COMPOSE_FILE config 2>&1 | tee -a "$deploy_log"
+docker-compose -f COMPOSE_FILE pull 2>&1 | tee -a "$deploy_log"
+docker-compose -f COMPOSE_FILE up -d --remove-orphans 2>&1 | tee -a "$deploy_log"
+docker-compose -f COMPOSE_FILE ps 2>&1 | tee -a "$deploy_log"
 echo "DEPLOY_LOG=$deploy_log"
 '@
-$deployCommand = $deployCommand.Replace("REPO_PATH", $RepoPath)
+$deployCommand = $deployCommand.Replace("REPO_PATH", $RepoPath).Replace("COMPOSE_FILE", $ComposeFile)
 Invoke-RemoteCommand $deployCommand
 
 if ($FollowLogs) {
     Write-Section "Follow Logs"
     $logCommand = @'
 cd REPO_PATH
-docker-compose -f docker-compose.yml -f docker-compose.ec2.yml logs --no-color --tail=TAIL_LINES -f
+docker-compose -f COMPOSE_FILE logs --no-color --tail=TAIL_LINES -f
 '@
-    $logCommand = $logCommand.Replace("REPO_PATH", $RepoPath).Replace("TAIL_LINES", [string]$TailLines)
+    $logCommand = $logCommand.Replace("REPO_PATH", $RepoPath).Replace("COMPOSE_FILE", $ComposeFile).Replace("TAIL_LINES", [string]$TailLines)
     Invoke-RemoteCommand $logCommand
 }

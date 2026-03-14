@@ -137,6 +137,20 @@ Notes:
 - The EC2 override adds `.env.production` and mounts `./secrets/policymind-ai-80ed72ade163.json`.
 - If you do not need ADC credentials, the base compose file can run with `GCP_BEARER_TOKEN` instead.
 
+For AWS image-based deployment that pulls from Docker Hub instead of building on the server:
+
+```bash
+docker-compose -f docker-compose.aws.yml pull
+docker-compose -f docker-compose.aws.yml up -d
+```
+
+Notes:
+
+- `docker-compose.aws.yml` is a standalone production file intended for EC2 hosts
+- backend image defaults to `7nepalithito/policymind-document-service:latest`
+- frontend image defaults to `7nepalithito/policymind-document-service-frontend:latest`
+- you can override either image with `BACKEND_IMAGE` or `FRONTEND_IMAGE` in `.env.production`
+
 ## Current Frontend Pages
 
 - `/` - Login page
@@ -322,7 +336,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\diagnose-startup.ps1 -Watch
 
 ### 10) EC2 build/deploy visibility
 
-Use the EC2 deploy helper to stream build output live, save a deploy log on the server, and optionally follow container logs after the stack comes up.
+Use the EC2 deploy helper to stream deploy output live, save a deploy log on the server, and optionally follow container logs after the stack comes up.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1
@@ -338,7 +352,7 @@ What it does:
 
 - backs up `.env.production` and `secrets/` on the EC2 host
 - hard-resets the repo to `origin/main`
-- runs `docker-compose ... up --build -d` with live output
+- validates the chosen compose file, pulls images, and runs `docker-compose ... up -d`
 - saves the full deploy output to `/home/ec2-user/policymind-deploy-<timestamp>.log`
 - optionally tails live compose logs after deployment
 
