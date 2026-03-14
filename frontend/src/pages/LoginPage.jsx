@@ -17,26 +17,6 @@ export default function LoginPage() {
       key: "google",
       label: "Continue with Google",
       url: import.meta.env.VITE_GOOGLE_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/google`
-    },
-    {
-      key: "microsoft",
-      label: "Continue with Microsoft",
-      url: import.meta.env.VITE_MICROSOFT_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/microsoft`
-    },
-    {
-      key: "facebook",
-      label: "Continue with Facebook",
-      url: import.meta.env.VITE_FACEBOOK_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/facebook`
-    },
-    {
-      key: "linkedin",
-      label: "Continue with LinkedIn",
-      url: import.meta.env.VITE_LINKEDIN_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/linkedin`
-    },
-    {
-      key: "twitter",
-      label: "Continue with X (Twitter)",
-      url: import.meta.env.VITE_TWITTER_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/twitter`
     }
   ];
 
@@ -94,6 +74,8 @@ export default function LoginPage() {
       subtitle="Use password login for your local account, or continue with a social provider."
     >
       <form onSubmit={handleSubmit} className="form">
+        {error && <p className="error form-message">{error}</p>}
+
         <label htmlFor="username">Username</label>
         <input
           id="username"
@@ -141,7 +123,6 @@ export default function LoginPage() {
       </div>
 
       {successMessage && <p className="success">{successMessage}</p>}
-      {error && <p className="error">{error}</p>}
     </AuthShell>
   );
 }

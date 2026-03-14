@@ -432,6 +432,10 @@ a {
   margin-top: 12px;
 }
 
+.form-message {
+  margin: 0;
+}
+
 .code-block {
   margin-top: 14px;
   background: #0f172a;

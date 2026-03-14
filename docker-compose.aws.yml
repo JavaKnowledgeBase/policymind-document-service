@@ -40,6 +40,7 @@ services:
       SERVER_TOMCAT_REMOTEIP_PROTOCOL_HEADER: x-forwarded-proto
       SERVER_TOMCAT_REMOTE_IP_HEADER: x-forwarded-for
       AI_PROVIDER_EMBEDDING: ${AI_EMBEDDING_PROVIDER:-openai}
+      APP_OAUTH2_BASE_URL: ${APP_OAUTH2_BASE_URL:-https://policymindsolutions.com}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       GCP_LOCATION: ${GCP_LOCATION:-us-central1}
       GCP_VERTEX_EMBEDDING_MODEL: ${GCP_VERTEX_EMBEDDING_MODEL:-text-embedding-005}

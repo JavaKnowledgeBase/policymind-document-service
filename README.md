@@ -29,6 +29,7 @@ POSTGRES_PASSWORD=postgres
 OPENAI_API_KEY=your_openai_api_key
 JWT_SECRET=your_long_random_secret
 FRONTEND_OAUTH_CALLBACK_URL=http://localhost:5173/auth/callback
+APP_OAUTH2_BASE_URL=http://localhost:8080
 
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
@@ -195,6 +196,10 @@ Examples:
 - Twitter/X: `.../twitter`
 
 After updating `.env`, restart backend (or `docker compose up -d --build`).
+
+For Google specifically, make sure the Google OAuth app includes this authorized redirect URI for local Docker:
+
+`http://localhost:8080/login/oauth2/code/google`
 
 ## Quick Start
 

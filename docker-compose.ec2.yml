@@ -12,6 +12,7 @@ services:
     env_file:
       - .env.production
     environment:
+      APP_OAUTH2_BASE_URL: ${APP_OAUTH2_BASE_URL:-https://policymindsolutions.com}
       GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/policymind-ai-80ed72ade163.json
     volumes:
       - ./secrets/policymind-ai-80ed72ade163.json:/app/secrets/policymind-ai-80ed72ade163.json:ro
