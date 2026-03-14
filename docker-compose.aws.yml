@@ -58,7 +58,7 @@ services:
     image: ${FRONTEND_IMAGE:-7nepalithito/policymind-document-service-frontend:latest}
     container_name: policymind_frontend
     ports:
-      - "${FRONTEND_PORT:-80}:80"
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - policymind
     restart: unless-stopped

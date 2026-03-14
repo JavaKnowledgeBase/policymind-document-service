@@ -57,10 +57,10 @@ set -e
 cd REPO_PATH
 deploy_log=/home/ec2-user/policymind-deploy-$(date +%Y%m%d-%H%M%S).log
 echo "Deploy log: $deploy_log"
-docker-compose -f COMPOSE_FILE config 2>&1 | tee -a "$deploy_log"
-docker-compose -f COMPOSE_FILE pull 2>&1 | tee -a "$deploy_log"
-docker-compose -f COMPOSE_FILE up -d --remove-orphans 2>&1 | tee -a "$deploy_log"
-docker-compose -f COMPOSE_FILE ps 2>&1 | tee -a "$deploy_log"
+docker-compose --env-file .env.production -f COMPOSE_FILE config 2>&1 | tee -a "$deploy_log"
+docker-compose --env-file .env.production -f COMPOSE_FILE pull 2>&1 | tee -a "$deploy_log"
+docker-compose --env-file .env.production -f COMPOSE_FILE up -d --remove-orphans 2>&1 | tee -a "$deploy_log"
+docker-compose --env-file .env.production -f COMPOSE_FILE ps 2>&1 | tee -a "$deploy_log"
 echo "DEPLOY_LOG=$deploy_log"
 '@
 $deployCommand = $deployCommand.Replace("REPO_PATH", $RepoPath).Replace("COMPOSE_FILE", $ComposeFile)
@@ -70,7 +70,7 @@ if ($FollowLogs) {
     Write-Section "Follow Logs"
     $logCommand = @'
 cd REPO_PATH
-docker-compose -f COMPOSE_FILE logs --no-color --tail=TAIL_LINES -f
+docker-compose --env-file .env.production -f COMPOSE_FILE logs --no-color --tail=TAIL_LINES -f
 '@
     $logCommand = $logCommand.Replace("REPO_PATH", $RepoPath).Replace("COMPOSE_FILE", $ComposeFile).Replace("TAIL_LINES", [string]$TailLines)
     Invoke-RemoteCommand $logCommand

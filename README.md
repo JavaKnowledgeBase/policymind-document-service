@@ -140,8 +140,8 @@ Notes:
 For AWS image-based deployment that pulls from Docker Hub instead of building on the server:
 
 ```bash
-docker-compose -f docker-compose.aws.yml pull
-docker-compose -f docker-compose.aws.yml up -d
+docker-compose --env-file .env.production -f docker-compose.aws.yml pull
+docker-compose --env-file .env.production -f docker-compose.aws.yml up -d
 ```
 
 Notes:
@@ -149,6 +149,7 @@ Notes:
 - `docker-compose.aws.yml` is a standalone production file intended for EC2 hosts
 - backend image defaults to `7nepalithito/policymind-document-service:latest`
 - frontend image defaults to `7nepalithito/policymind-document-service-frontend:latest`
+- frontend host port defaults to `5173` unless `FRONTEND_PORT` is set in `.env.production`
 - you can override either image with `BACKEND_IMAGE` or `FRONTEND_IMAGE` in `.env.production`
 
 ## Current Frontend Pages
