@@ -19,8 +19,10 @@ public class OAuth2AuthenticationFailureHandlerTest {
         f.set(handler, "http://localhost:5173/auth/callback");
 
         HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getRequestURI()).thenReturn("/login/oauth2/code/google");
         HttpServletResponse resp = mock(HttpServletResponse.class);
         AuthenticationException ex = mock(AuthenticationException.class);
+        when(ex.getMessage()).thenReturn("authorization_request_not_found");
 
         handler.onAuthenticationFailure(req, resp, ex);
 
@@ -28,5 +30,7 @@ public class OAuth2AuthenticationFailureHandlerTest {
         verify(resp).sendRedirect(capt.capture());
         String url = capt.getValue();
         assertTrue(url.contains("error=oauth_login_failed"));
+        assertTrue(url.contains("provider=google"));
+        assertTrue(url.contains("reason=authorization_request_not_found"));
     }
 }

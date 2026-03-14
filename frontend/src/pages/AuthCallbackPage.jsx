@@ -11,6 +11,8 @@ export default function AuthCallbackPage() {
     const params = new URLSearchParams(location.search);
     const token = params.get("token");
     const error = params.get("error");
+    const provider = params.get("provider");
+    const reason = params.get("reason");
 
     if (token) {
       localStorage.setItem("authToken", token);
@@ -19,7 +21,15 @@ export default function AuthCallbackPage() {
     }
 
     if (error) {
-      navigate("/?oauthError=1", { replace: true });
+      const nextParams = new URLSearchParams();
+      nextParams.set("oauthError", "1");
+      if (provider) {
+        nextParams.set("oauthProvider", provider);
+      }
+      if (reason) {
+        nextParams.set("oauthReason", reason);
+      }
+      navigate(`/?${nextParams.toString()}`, { replace: true });
       return;
     }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import client, { API_BASE_URL } from "../api/client";
+import client from "../api/client";
 import AuthShell from "../components/AuthShell";
 
 export default function LoginPage() {
@@ -12,18 +12,14 @@ export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const socialProviders = [
-    {
-      key: "google",
-      label: "Continue with Google",
-      url: import.meta.env.VITE_GOOGLE_AUTH_URL || `${API_BASE_URL}/oauth2/authorization/google`
-    }
-  ];
-
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get("oauthError")) {
-      setError("OAuth login failed. Check provider credentials and callback settings.");
+      const provider = params.get("oauthProvider");
+      const reason = params.get("oauthReason");
+      const providerLabel = provider ? `${provider.charAt(0).toUpperCase()}${provider.slice(1)} ` : "";
+      const reasonSuffix = reason ? ` Reason: ${reason}` : "";
+      setError(`${providerLabel}OAuth login failed. Check provider credentials and callback settings.${reasonSuffix}`);
     }
     if (location.state?.successMessage) {
       setSuccessMessage(location.state.successMessage);
@@ -59,19 +55,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialLogin = (providerName, authUrl) => {
-    clearMessages();
-    if (!authUrl) {
-      setError(`${providerName} login is not configured yet. Add its URL in frontend/.env.`);
-      return;
-    }
-    window.location.href = authUrl;
-  };
-
   return (
     <AuthShell
       title="Sign In"
-      subtitle="Use password login for your local account, or continue with a social provider."
+      subtitle="Use password login for your local account."
     >
       <form onSubmit={handleSubmit} className="form">
         {error && <p className="error form-message">{error}</p>}
@@ -104,24 +91,6 @@ export default function LoginPage() {
         <Link to="/register">Register</Link>
         <Link to="/reset-password">Change password</Link>
       </div>
-
-      <div className="divider" aria-hidden="true">
-        <span>or</span>
-      </div>
-
-      <div className="social-grid">
-        {socialProviders.map((provider) => (
-          <button
-            key={provider.key}
-            type="button"
-            className={`social-btn social-${provider.key}`}
-            onClick={() => handleSocialLogin(provider.label, provider.url)}
-          >
-            {provider.label}
-          </button>
-        ))}
-      </div>
-
       {successMessage && <p className="success">{successMessage}</p>}
     </AuthShell>
   );
