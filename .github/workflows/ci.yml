@@ -53,4 +53,6 @@ jobs:
         with:
           context: ./frontend
           push: true
+          build-args: |
+            VITE_API_BASE_URL=/api
           tags: 7nepalithito/policymind-document-service-frontend:latest
