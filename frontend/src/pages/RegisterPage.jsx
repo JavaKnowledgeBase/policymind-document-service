@@ -40,7 +40,13 @@ export default function RegisterPage() {
         }
       });
     } catch (err) {
-      setError(err.response?.data?.error || "Registration failed.");
+      const statusCode = err.response?.status;
+      const apiError = err.response?.data?.error;
+      const networkMessage = err.message;
+      const fallbackMessage = "Registration failed before the request completed.";
+      const detail = apiError || networkMessage || fallbackMessage;
+
+      setError(statusCode ? `Registration failed (${statusCode}): ${detail}` : detail);
     } finally {
       setIsRegistering(false);
     }
