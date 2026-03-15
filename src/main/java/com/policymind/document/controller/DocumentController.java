@@ -1,6 +1,9 @@
 
 package com.policymind.document.controller;
 
+import com.policymind.document.exception.DocumentProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
@@ -12,6 +15,8 @@ import java.util.Map;
 @RestController
 public class DocumentController {
 
+    private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
+
     private final DocumentService documentService;
 
     public DocumentController(DocumentService documentService) {
@@ -21,6 +26,12 @@ public class DocumentController {
 	// Upload returns immediately and lets the worker finish parsing/chunking/embedding in the background.
 	@PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
+        logger.info(
+                "Upload request received, fileName='{}', contentType='{}', sizeBytes={}",
+                file == null ? null : file.getOriginalFilename(),
+                file == null ? null : file.getContentType(),
+                file == null ? null : file.getSize()
+        );
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(documentService.submitDocument(file));
     }
 
@@ -59,5 +70,18 @@ public class DocumentController {
 
 	    return ResponseEntity.ok(documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
 	}
+
+    @ExceptionHandler(DocumentProcessingException.class)
+    public ResponseEntity<Map<String, Object>> handleDocumentProcessingException(DocumentProcessingException ex) {
+        logger.error("Document request failed: {}", ex.getMessage(), ex);
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpectedException(Exception ex) {
+        logger.error("Unexpected document controller error", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Unexpected server error during document handling."));
+    }
     
 }

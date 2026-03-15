@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 public class DocumentControllerTest {
 
@@ -40,5 +41,20 @@ public class DocumentControllerTest {
 
         mvc.perform(get("/documents/42"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    public void uploadEndpoint_returnsBadRequestWhenProcessingFails() throws Exception {
+        DocumentService ds = Mockito.mock(DocumentService.class);
+        when(ds.submitDocument(any())).thenThrow(new com.policymind.document.exception.DocumentProcessingException("Uploaded file is empty."));
+
+        DocumentController controller = new DocumentController(ds);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        MockMultipartFile file = new MockMultipartFile("file", "test.pdf", MediaType.APPLICATION_PDF_VALUE, new byte[0]);
+
+        mvc.perform(multipart("/upload").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("Uploaded file is empty."));
     }
 }

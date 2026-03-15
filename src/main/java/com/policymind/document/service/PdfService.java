@@ -27,6 +27,8 @@
  */
 package com.policymind.document.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -36,6 +38,8 @@ import java.io.IOException;
 
 @Service
 public class PdfService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PdfService.class);
 	
 	private String status;
 
@@ -47,10 +51,15 @@ public class PdfService {
     }
 
     public String extractText(byte[] fileBytes) throws IOException {
-        PDDocument document = PDDocument.load(new ByteArrayInputStream(fileBytes));
-        PDFTextStripper stripper = new PDFTextStripper();
-        String text = stripper.getText(document);
-        document.close();
-        return text;
+        logger.info("PdfService.extractText called, sizeBytes={}", fileBytes == null ? null : fileBytes.length);
+        try (PDDocument document = PDDocument.load(new ByteArrayInputStream(fileBytes))) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            String text = stripper.getText(document);
+            logger.info("PdfService.extractText completed, pages={}, extractedCharacters={}", document.getNumberOfPages(), text == null ? null : text.length());
+            return text;
+        } catch (IOException ex) {
+            logger.error("PdfService.extractText failed", ex);
+            throw ex;
+        }
     }
 }

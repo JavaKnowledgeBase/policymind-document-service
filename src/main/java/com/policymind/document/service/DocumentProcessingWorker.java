@@ -20,7 +20,12 @@ public class DocumentProcessingWorker {
     public void processDocumentAsync(Long documentId, String fileName, byte[] fileBytes) {
         try {
             // The worker boundary is the first step toward extracting processing into its own service.
-            logger.info("Queued document picked up by async worker, documentId={}, file={}", documentId, fileName);
+            logger.info(
+                    "Queued document picked up by async worker, documentId={}, file='{}', sizeBytes={}",
+                    documentId,
+                    fileName,
+                    fileBytes == null ? null : fileBytes.length
+            );
             documentProcessingPipeline.processStoredDocument(documentId, fileName, fileBytes);
             logger.info("Async worker finished processing documentId={}", documentId);
         } catch (Exception ex) {

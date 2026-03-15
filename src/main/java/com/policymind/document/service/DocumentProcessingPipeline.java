@@ -41,6 +41,12 @@ public class DocumentProcessingPipeline {
         Document savedDoc = repository.findById(documentId)
                 .orElseThrow(() -> new DocumentProcessingException("Document not found: " + documentId));
         String stage = "initialize";
+        logger.info(
+                "processStoredDocument entered, documentId={}, file='{}', sizeBytes={}",
+                documentId,
+                fileName,
+                fileBytes == null ? null : fileBytes.length
+        );
 
         try {
             stage = "mark document processing";
@@ -70,6 +76,12 @@ public class DocumentProcessingPipeline {
             int chunkCount = 0;
             for (int idx = 0; idx < chunks.size(); idx++) {
                 String chunkText = chunks.get(idx);
+                logger.debug(
+                        "Generating embedding for documentId={}, chunkIndex={}, chunkLength={}",
+                        savedDoc.getId(),
+                        idx,
+                        chunkText == null ? null : chunkText.length()
+                );
                 List<Double> embeddingVector = embeddingService.generateEmbedding(chunkText);
                 LineRange lineRange = chunkLineRanges.get(idx);
 
@@ -101,10 +113,11 @@ public class DocumentProcessingPipeline {
             );
         } catch (Exception e) {
             logger.error(
-                    "Document processing failed at stage='{}', documentId='{}', file='{}'",
+                    "Document processing failed at stage='{}', documentId='{}', file='{}', sizeBytes={}",
                     stage,
                     savedDoc.getId(),
                     savedDoc.getFileName(),
+                    fileBytes == null ? null : fileBytes.length,
                     e
             );
 

@@ -60,13 +60,26 @@ public class DocumentService {
     }
 
     public Map<String, Object> submitDocument(MultipartFile file) {
+        logger.info(
+                "submitDocument called, fileName='{}', contentType='{}', sizeBytes={}",
+                file == null ? null : file.getOriginalFilename(),
+                file == null ? null : file.getContentType(),
+                file == null ? null : file.getSize()
+        );
         if (file == null || file.isEmpty()) {
+            logger.warn("submitDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
         }
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "QUEUED");
-        logger.info("Document accepted for async processing, documentId={}, file={}", savedDoc.getId(), savedDoc.getFileName());
-        documentProcessingWorker.processDocumentAsync(savedDoc.getId(), savedDoc.getFileName(), readFileBytes(file));
+        byte[] fileBytes = readFileBytes(file, savedDoc.getId());
+        logger.info(
+                "Document accepted for async processing, documentId={}, file='{}', sizeBytes={}",
+                savedDoc.getId(),
+                savedDoc.getFileName(),
+                fileBytes.length
+        );
+        documentProcessingWorker.processDocumentAsync(savedDoc.getId(), savedDoc.getFileName(), fileBytes);
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Document accepted for processing.");
@@ -288,10 +301,23 @@ public class DocumentService {
         return savedDocument;
     }
 
-    private byte[] readFileBytes(MultipartFile file) {
+    private byte[] readFileBytes(MultipartFile file, Long documentId) {
         try {
-            return file.getBytes();
+            byte[] fileBytes = file.getBytes();
+            logger.info(
+                    "Uploaded file bytes read successfully, documentId={}, file='{}', sizeBytes={}",
+                    documentId,
+                    file.getOriginalFilename(),
+                    fileBytes.length
+            );
+            return fileBytes;
         } catch (IOException e) {
+            logger.error(
+                    "Failed to read uploaded file bytes, documentId={}, file='{}'",
+                    documentId,
+                    file == null ? null : file.getOriginalFilename(),
+                    e
+            );
             throw new DocumentProcessingException("Failed to read uploaded file bytes.", e);
         }
     }
