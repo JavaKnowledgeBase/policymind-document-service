@@ -5,10 +5,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class HealthController {
-	
-	@GetMapping("/")
+
+    private static final String HEALTH_MESSAGE = "PolicyMind Document Service is running";
+
+    @GetMapping({"/", "/health"})
     public String home() {
-        return "PolicyMind Document Service is running";
+        return HEALTH_MESSAGE;
     }
 
 }
