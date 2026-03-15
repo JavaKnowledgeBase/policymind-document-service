@@ -31,6 +31,11 @@ function toResponseLength(response) {
 
 function isUsableResponse(response) {
   const answer = String(response?.answer || "").trim().toLowerCase();
+  const summary = String(response?.summary || "").trim().toLowerCase();
+  const hasStructuredContent =
+    summary.length > 0 ||
+    (response?.key_risks || []).length > 0 ||
+    (response?.recommended_actions || []).length > 0;
   const invalidPhrases = [
     "no answer available",
     "answer not provided",
@@ -38,11 +43,14 @@ function isUsableResponse(response) {
     "service temporarily unavailable"
   ];
 
-  if (!answer) {
+  if (!answer && !hasStructuredContent) {
     return false;
   }
 
-  return !invalidPhrases.some((phrase) => answer.includes(phrase));
+  const invalidAnswer = answer && invalidPhrases.some((phrase) => answer.includes(phrase));
+  const invalidSummary = summary && invalidPhrases.some((phrase) => summary.includes(phrase));
+
+  return !(invalidAnswer && invalidSummary);
 }
 
 export default function UploadPage() {
@@ -147,7 +155,10 @@ export default function UploadPage() {
         );
       }
     } catch (err) {
-      setError("Upload failed. Try again or check server logs.");
+      const statusCode = err.response?.status;
+      const apiError = err.response?.data?.error;
+      const detail = apiError || err.message || "Upload failed before the request completed.";
+      setError(statusCode ? `Upload failed (${statusCode}): ${detail}` : detail);
     } finally {
       setIsUploading(false);
     }
