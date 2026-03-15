@@ -51,12 +51,26 @@ public class DocumentService {
     }
 
     public Map<String, Object> processDocument(MultipartFile file) {
+        logger.info(
+                "processDocument called, fileName='{}', contentType='{}', sizeBytes={}",
+                file == null ? null : file.getOriginalFilename(),
+                file == null ? null : file.getContentType(),
+                file == null ? null : file.getSize()
+        );
         if (file == null || file.isEmpty()) {
+            logger.warn("processDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
         }
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "PROCESSING");
-        return documentProcessingPipeline.processStoredDocument(savedDoc.getId(), savedDoc.getFileName(), readFileBytes(file));
+        byte[] fileBytes = readFileBytes(file, savedDoc.getId());
+        logger.info(
+                "Document accepted for immediate processing, documentId={}, file='{}', sizeBytes={}",
+                savedDoc.getId(),
+                savedDoc.getFileName(),
+                fileBytes.length
+        );
+        return documentProcessingPipeline.processStoredDocument(savedDoc.getId(), savedDoc.getFileName(), fileBytes);
     }
 
     public Map<String, Object> submitDocument(MultipartFile file) {
