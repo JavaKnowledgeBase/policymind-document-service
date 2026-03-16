@@ -7,15 +7,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.web.multipart.MultipartFile;
 import com.policymind.document.service.DocumentService;
 
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @RestController
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
+    private static final CacheControl NO_STORE = CacheControl.maxAge(0, TimeUnit.SECONDS)
+            .noCache()
+            .mustRevalidate()
+            .cachePrivate()
+            .noStore();
 
     private final DocumentService documentService;
 
@@ -32,13 +39,13 @@ public class DocumentController {
                 file == null ? null : file.getContentType(),
                 file == null ? null : file.getSize()
         );
-        return ResponseEntity.status(HttpStatus.ACCEPTED).body(documentService.submitDocument(file));
+        return noStore(HttpStatus.ACCEPTED, documentService.submitDocument(file));
     }
 
     // This gives the UI a polling-friendly status endpoint ahead of a full worker/service split.
     @GetMapping("/documents/{id}")
     public ResponseEntity<Map<String, Object>> getDocumentStatus(@PathVariable Long id) {
-        return ResponseEntity.ok(documentService.getDocumentStatus(id));
+        return noStore(HttpStatus.OK, documentService.getDocumentStatus(id));
     }
 	
 	@PostMapping("/{id}/ask")
@@ -55,7 +62,7 @@ public class DocumentController {
         }
 
         if (finalQuestion == null || finalQuestion.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Question is required"));
+            return noStore(HttpStatus.BAD_REQUEST, Map.of("error", "Question is required"));
         }
 
         String finalEmbeddingProvider = embeddingProvider;
@@ -68,20 +75,27 @@ public class DocumentController {
             finalAnswerProvider = payload.get("answerProvider").toString();
         }
 
-	    return ResponseEntity.ok(documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
+	    return noStore(HttpStatus.OK, documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
 	}
 
     @ExceptionHandler(DocumentProcessingException.class)
     public ResponseEntity<Map<String, Object>> handleDocumentProcessingException(DocumentProcessingException ex) {
         logger.error("Document request failed: {}", ex.getMessage(), ex);
-        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        return noStore(HttpStatus.BAD_REQUEST, Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpectedException(Exception ex) {
         logger.error("Unexpected document controller error", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Unexpected server error during document handling."));
+        return noStore(HttpStatus.INTERNAL_SERVER_ERROR, Map.of("error", "Unexpected server error during document handling."));
     }
-    
+
+    private ResponseEntity<Map<String, Object>> noStore(HttpStatus status, Map<String, Object> body) {
+        return ResponseEntity.status(status)
+                .cacheControl(NO_STORE)
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
+                .header("Vary", "Authorization")
+                .body(body);
+    }
 }

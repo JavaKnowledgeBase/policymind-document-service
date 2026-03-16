@@ -27,7 +27,7 @@ export default function ResetPasswordPage() {
     clearMessages();
 
     if (!form.username.trim()) {
-      setError("Enter your username to fetch the security question.");
+      setError("Enter your username to load your security question.");
       return;
     }
 
@@ -37,9 +37,9 @@ export default function ResetPasswordPage() {
         params: { username: form.username.trim() }
       });
       setSecurityQuestion(response.data.securityQuestion || "");
-      setSuccessMessage("Security question loaded. Answer it to choose a new password.");
+      setSuccessMessage("Your security question is ready. Answer it to set a new password.");
     } catch (err) {
-      setError(err.response?.data?.error || "Could not load security question.");
+      setError(err.response?.data?.error || "We could not load your security question.");
       setSecurityQuestion("");
     } finally {
       setIsFetchingQuestion(false);
@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
     clearMessages();
 
     if (!form.username.trim() || !form.securityAnswer.trim() || !form.newPassword.trim()) {
-      setError("Username, security answer, and new password are required.");
+      setError("Complete all fields before resetting your password.");
       return;
     }
 
@@ -65,11 +65,11 @@ export default function ResetPasswordPage() {
       navigate("/", {
         replace: true,
         state: {
-          successMessage: "Password reset successful. Sign in with your new password."
+          successMessage: "Your password has been updated. Sign in with your new password."
         }
       });
     } catch (err) {
-      setError(err.response?.data?.error || "Password reset failed.");
+      setError(err.response?.data?.error || "We could not reset your password. Please try again.");
     } finally {
       setIsResetting(false);
     }
@@ -78,7 +78,7 @@ export default function ResetPasswordPage() {
   return (
     <AuthShell
       title="Reset Password"
-      subtitle="Load your saved security question, answer it, and set a new password."
+      subtitle="Answer your security question and choose a new password."
     >
       <form onSubmit={handleResetPassword} className="form">
         <label htmlFor="reset-username">Username</label>
@@ -86,16 +86,16 @@ export default function ResetPasswordPage() {
           id="reset-username"
           value={form.username}
           onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))}
-          placeholder="Enter username"
+          placeholder="Enter your username"
           autoComplete="username"
         />
 
         <button type="button" className="secondary" onClick={handleFetchQuestion} disabled={isFetchingQuestion}>
-          {isFetchingQuestion ? "Loading question..." : "Load Security Question"}
+          {isFetchingQuestion ? "Loading question..." : "Load Question"}
         </button>
 
         {securityQuestion && (
-          <p className="security-question"><strong>Security question:</strong> {securityQuestion}</p>
+          <p className="security-question"><strong>Your security question:</strong> {securityQuestion}</p>
         )}
 
         <label htmlFor="reset-answer">Security answer</label>
@@ -104,7 +104,7 @@ export default function ResetPasswordPage() {
           type="password"
           value={form.securityAnswer}
           onChange={(e) => setForm((current) => ({ ...current, securityAnswer: e.target.value }))}
-          placeholder="Enter answer"
+          placeholder="Enter your answer"
           autoComplete="off"
         />
 
@@ -114,12 +114,12 @@ export default function ResetPasswordPage() {
           type="password"
           value={form.newPassword}
           onChange={(e) => setForm((current) => ({ ...current, newPassword: e.target.value }))}
-          placeholder="Enter new password"
+          placeholder="Create a new password"
           autoComplete="new-password"
         />
 
         <button type="submit" disabled={isResetting}>
-          {isResetting ? "Resetting..." : "Reset Password"}
+          {isResetting ? "Updating password..." : "Update Password"}
         </button>
       </form>
 
@@ -127,7 +127,7 @@ export default function ResetPasswordPage() {
       {error && <p className="error">{error}</p>}
 
       <div className="auth-links">
-        <Link to="/">Back to login</Link>
+        <Link to="/">Back to sign in</Link>
         <Link to="/register">Need an account?</Link>
       </div>
     </AuthShell>

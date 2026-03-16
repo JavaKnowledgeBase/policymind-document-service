@@ -9,16 +9,25 @@ export default function AuthShell({ title, subtitle, children }) {
         <div className="vision-shell">
           <article className="vision-panel">
             <p className="eyebrow">PolicyMind AI</p>
-            <h1>Understand Complex Policies and Contracts in Minutes</h1>
+            <h1>Review complex documents with more clarity</h1>
             <p>
-              AI-powered policy intelligence platform built on microservices, RAG retrieval, vector search,
-              and secure cloud-ready architecture.
+              A simple, secure way to upload documents, ask questions, and get clear answers fast.
             </p>
             <ul className="feature-list">
-              <li>Simplifies legal and insurance language for faster decisions.</li>
-              <li>Highlights risk areas and clause-level insights for each document.</li>
-              <li>Supports growth from freemium users to enterprise agency workflows.</li>
+              <li>Turns dense policy language into plain-English summaries.</li>
+              <li>Brings key risks, important clauses, and next steps to the surface.</li>
+              <li>Keeps your team moving with a guided and secure review workflow.</li>
             </ul>
+            <div className="highlight-strip">
+              <div className="highlight-card">
+                <strong>Faster reviews</strong>
+                <span>Spend less time searching through long documents.</span>
+              </div>
+              <div className="highlight-card">
+                <strong>Clear answers</strong>
+                <span>Ask a question and see the evidence behind the response.</span>
+              </div>
+            </div>
           </article>
 
           <article className="login-panel">
@@ -29,9 +38,9 @@ export default function AuthShell({ title, subtitle, children }) {
         </div>
       </section>
       <div className="login-bottom-left">
-        <p>RAG + Explainability</p>
-        <p>JWT + Secure APIs</p>
-        <p>Redis + Vector Search</p>
+        <p>Clear answers</p>
+        <p>Secure sign-in</p>
+        <p>Reliable search</p>
       </div>
       <DeveloperCredit />
     </main>

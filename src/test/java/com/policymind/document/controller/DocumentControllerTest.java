@@ -12,6 +12,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
@@ -28,7 +30,11 @@ public class DocumentControllerTest {
         MockMultipartFile file = new MockMultipartFile("file","test.pdf", MediaType.APPLICATION_PDF_VALUE, "hi".getBytes());
 
         mvc.perform(multipart("/upload").file(file))
-                .andExpect(status().isAccepted());
+                .andExpect(status().isAccepted())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("Pragma", "no-cache"))
+                .andExpect(header().string("Expires", "0"))
+                .andExpect(header().string("Vary", org.hamcrest.Matchers.containsString("Authorization")));
     }
 
     @Test
@@ -40,7 +46,10 @@ public class DocumentControllerTest {
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
 
         mvc.perform(get("/documents/42"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("Pragma", "no-cache"))
+                .andExpect(header().string("Expires", "0"));
     }
 
     @Test
@@ -55,6 +64,22 @@ public class DocumentControllerTest {
 
         mvc.perform(multipart("/upload").file(file))
                 .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
                 .andExpect(jsonPath("$.error").value("Uploaded file is empty."));
+    }
+
+    @Test
+    public void askEndpoint_returnsBadRequestAndNoStoreWhenQuestionMissing() throws Exception {
+        DocumentService ds = Mockito.mock(DocumentService.class);
+
+        DocumentController controller = new DocumentController(ds);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        mvc.perform(post("/42/ask")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(jsonPath("$.error").value("Question is required"));
     }
 }

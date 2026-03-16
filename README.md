@@ -61,7 +61,7 @@ Backend logs are written to:
 
 ## Run Backend Tests
 
-Use the repo-local helper so Maven dependencies and PDFBox font cache stay inside the workspace:
+Use the local helper so Maven dependencies and PDFBox font cache stay inside the workspace:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run-tests.ps1
@@ -75,9 +75,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run-tests.ps1 -Test "Document
 
 Notes:
 
-- the helper uses the checked-in Maven path at `.tools/apache-maven-3.9.9`
+- the helper prefers `mvn.cmd` from your PATH and falls back to checked-in Maven under `.tools/`
 - dependencies are cached under `.m2/repository`
 - PDFBox font cache is redirected to `.pdfbox-cache` to avoid profile-directory permission issues
+
+To include a frontend production build in the same local check:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-tests.ps1 -FrontendBuild
+```
 
 ## Run Frontend (Local)
 
@@ -355,7 +361,15 @@ powershell -ExecutionPolicy Bypass -File .\scripts\diagnose-startup.ps1 -Watch
 
 ### 10) EC2 build/deploy visibility
 
-Use the EC2 deploy helper to stream deploy output live, save a deploy log on the server, and optionally follow container logs after the stack comes up.
+Use the EC2 deploy helper to validate locally first, save a deploy log on the server, and optionally follow container logs after the stack comes up.
+
+Recommended flow:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\preflight-release.ps1
+```
+
+Then deploy:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1
@@ -369,11 +383,19 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1 -FollowLogs
 
 What it does:
 
+- runs a local preflight first unless `-SkipLocalPreflight` is passed
 - backs up `.env.production` and `secrets/` on the EC2 host
 - hard-resets the repo to `origin/main`
 - validates the chosen compose file, pulls images, and runs `docker-compose ... up -d`
 - saves the full deploy output to `/home/ec2-user/policymind-deploy-<timestamp>.log`
+- checks that the backend/frontend containers reach a running or healthy state before finishing
 - optionally tails live compose logs after deployment
+
+To keep deployment smaller and safer when the server already has the right repo state:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-ec2.ps1 -SkipGitSync
+```
 
 ## Health Checks
 

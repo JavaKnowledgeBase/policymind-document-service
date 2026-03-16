@@ -1,19 +1,59 @@
 param(
     [string]$Test = "",
-    [switch]$SkipFrontend
+    [switch]$SkipFrontend,
+    [switch]$FrontendBuild
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$mavenHome = Join-Path $repoRoot ".tools\apache-maven-3.9.9"
-$mavenCmd = Join-Path $mavenHome "bin\mvn.cmd"
 $mavenRepo = Join-Path $repoRoot ".m2\repository"
 $pdfBoxCache = Join-Path $repoRoot ".pdfbox-cache"
+$frontendRoot = Join-Path $repoRoot "frontend"
 
-if (-not (Test-Path $mavenCmd)) {
-    throw "Local Maven not found at '$mavenCmd'. Download Apache Maven 3.9.9 into .tools before running tests."
+function Resolve-MavenCommand {
+    $globalMaven = Get-Command mvn.cmd -ErrorAction SilentlyContinue
+    if ($globalMaven) {
+        return $globalMaven.Source
+    }
+
+    $repoMavenCandidates = @(
+        (Join-Path $repoRoot ".tools\apache-maven-3.9.14\bin\mvn.cmd"),
+        (Join-Path $repoRoot ".tools\apache-maven-3.9.9\bin\mvn.cmd")
+    )
+
+    foreach ($candidate in $repoMavenCandidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    throw "Maven not found. Install Maven on PATH or place it under .tools\\apache-maven-3.9.14 or .tools\\apache-maven-3.9.9."
 }
+
+function Invoke-FrontendBuild {
+    param([string]$FrontendPath)
+
+    if (-not (Test-Path (Join-Path $FrontendPath "package.json"))) {
+        Write-Host "Frontend package.json not found. Skipping frontend build." -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host ""
+    Write-Host "Running frontend production build..." -ForegroundColor Cyan
+    Push-Location $FrontendPath
+    try {
+        & cmd /c npm run build
+        if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+$mavenCmd = Resolve-MavenCommand
 
 New-Item -ItemType Directory -Force -Path $mavenRepo | Out-Null
 New-Item -ItemType Directory -Force -Path $pdfBoxCache | Out-Null
@@ -40,8 +80,12 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-if (-not $SkipFrontend -and (Test-Path (Join-Path $repoRoot "frontend\package.json"))) {
+if (-not $SkipFrontend -and $FrontendBuild) {
+    Invoke-FrontendBuild -FrontendPath $frontendRoot
+}
+elseif (-not $SkipFrontend -and (Test-Path (Join-Path $repoRoot "frontend\package.json"))) {
     Write-Host ""
     Write-Host "Frontend tests are not configured in this helper yet." -ForegroundColor Yellow
+    Write-Host "Use -FrontendBuild to run a local production build as a preflight check." -ForegroundColor Yellow
     Write-Host "Backend Maven tests completed successfully." -ForegroundColor Green
 }

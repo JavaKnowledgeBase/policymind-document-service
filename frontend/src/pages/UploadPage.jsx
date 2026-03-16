@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import BrandBar from "../components/BrandBar";
@@ -53,6 +53,19 @@ function isUsableResponse(response) {
   return !(invalidAnswer && invalidSummary);
 }
 
+function toStatusTone(status) {
+  if (status === "COMPLETED") {
+    return "success";
+  }
+  if (status === "FAILED") {
+    return "danger";
+  }
+  if (status === "PROCESSING" || status === "QUEUED") {
+    return "warning";
+  }
+  return "neutral";
+}
+
 export default function UploadPage() {
   const [file, setFile] = useState(null);
   const [documentId, setDocumentId] = useState("");
@@ -63,9 +76,16 @@ export default function UploadPage() {
   const [isAsking, setIsAsking] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+  const uploadRequestIdRef = useRef(0);
+  const statusRequestIdRef = useRef(0);
+  const askRequestIdRef = useRef(0);
   const navigate = useNavigate();
   const openAiResponse = answerData?.providers?.openai || answerData?.structuredOutput || null;
   const vertexResponse = answerData?.providers?.vertex || null;
+  const statusLabel = documentStatus?.status || "Waiting for upload";
+  const statusTone = toStatusTone(documentStatus?.status);
+  const canAskQuestion = Boolean(documentId && documentStatus?.status === "COMPLETED");
 
   const rankedAnalysts = [
     openAiResponse && { source: "openai", response: openAiResponse },
@@ -87,6 +107,7 @@ export default function UploadPage() {
 
       return toResponseLength(b.response) - toResponseLength(a.response);
     });
+  const leadAnalyst = rankedAnalysts[0] || null;
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -94,7 +115,11 @@ export default function UploadPage() {
   };
 
   const loadDocumentStatus = async (id) => {
+    const requestId = ++statusRequestIdRef.current;
     const response = await client.get(`/documents/${id}`);
+    if (requestId !== statusRequestIdRef.current) {
+      return;
+    }
     setDocumentStatus(response.data);
   };
 
@@ -123,18 +148,25 @@ export default function UploadPage() {
     setDocumentStatus(null);
 
     if (!file) {
-      setError("Please select a file.");
+      setError("Choose a file to get started.");
       return;
     }
 
     const formData = new FormData();
     formData.append("file", file);
+    const requestId = ++uploadRequestIdRef.current;
 
     try {
       setIsUploading(true);
       const response = await client.post("/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Upload-Request-Id": `upload-${Date.now()}-${requestId}`
+        }
       });
+      if (requestId !== uploadRequestIdRef.current) {
+        return;
+      }
       const data = response.data;
       if (typeof data === "string") {
         setMessage(data);
@@ -151,16 +183,25 @@ export default function UploadPage() {
           chunksStored: data?.chunksStored ?? 0
         });
         setMessage(
-          `Accepted ${fileName}. Document ID: ${documentId}. Processing continues in the background.`
+          `${fileName} has been uploaded. Document ID: ${documentId}. We are processing it now in the background.`
         );
       }
     } catch (err) {
+      if (requestId !== uploadRequestIdRef.current) {
+        return;
+      }
       const statusCode = err.response?.status;
       const apiError = err.response?.data?.error;
-      const detail = apiError || err.message || "Upload failed before the request completed.";
-      setError(statusCode ? `Upload failed (${statusCode}): ${detail}` : detail);
+      const detail = apiError || err.message || "The upload did not finish successfully.";
+      setError(statusCode ? `We could not upload that file (${statusCode}). ${detail}` : detail);
     } finally {
-      setIsUploading(false);
+      if (requestId === uploadRequestIdRef.current) {
+        setIsUploading(false);
+      }
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -170,81 +211,189 @@ export default function UploadPage() {
     setAnswerData(null);
 
     if (!documentId) {
-      setError("Document ID is required.");
+      setError("Enter a document ID before asking a question.");
       return;
     }
 
     if (!question.trim()) {
-      setError("Please enter a question.");
+      setError("Type a question about the document.");
       return;
     }
 
     if (documentStatus && documentStatus.status !== "COMPLETED") {
-      setError("Wait until processing is completed before asking questions.");
+      setError("This document is still being prepared. Please wait until processing is complete.");
       return;
     }
+
+    const requestId = ++askRequestIdRef.current;
 
     try {
       setIsAsking(true);
       const response = await client.post(`/${documentId}/ask`, {
         question,
         answerProvider: "both"
+      }, {
+        headers: {
+          "X-Question-Request-Id": `ask-${Date.now()}-${requestId}`
+        }
       });
+      if (requestId !== askRequestIdRef.current) {
+        return;
+      }
       setAnswerData(response.data);
     } catch (err) {
-      setError("Question failed. Check backend logs and AI provider settings.");
+      if (requestId !== askRequestIdRef.current) {
+        return;
+      }
+      setError("We could not answer that question right now. Please try again in a moment.");
     } finally {
-      setIsAsking(false);
+      if (requestId === askRequestIdRef.current) {
+        setIsAsking(false);
+      }
     }
   };
 
   return (
     <main className="page">
+      <div className="page-orb page-orb-left" aria-hidden="true" />
+      <div className="page-orb page-orb-right" aria-hidden="true" />
       <section className="card card-wide">
         <BrandBar />
-        <h1>Document Intelligence Workspace</h1>
-        <p className="muted">
-          Upload policy or contract files to trigger the retrieval pipeline: chunking, embedding, indexing,
-          and explainable AI analysis.
-        </p>
+        <div className="workspace-hero">
+          <div>
+            <p className="eyebrow">Review Workspace</p>
+            <h1>Upload, track, and review with confidence</h1>
+            <p className="muted workspace-lead">
+              Bring in a document, follow its processing status, and ask focused questions once the review is ready.
+            </p>
+          </div>
+          <div className="workspace-summary">
+            <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>
+            <p>{canAskQuestion ? "Your document is ready for questions." : "Upload a file to begin the review flow."}</p>
+          </div>
+        </div>
 
-        <form onSubmit={handleSubmit} className="form">
-          <label htmlFor="file">Document file</label>
-          <input
-            id="file"
-            type="file"
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-          />
+        <div className="workspace-grid">
+          <section className="workspace-main">
+            <div className="workspace-panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Step 1</p>
+                  <h2>Upload a document</h2>
+                </div>
+                <span className="panel-note">PDF, Word, or text files</span>
+              </div>
+              <p className="muted">
+                Choose a file and we will start processing it in the background so you can track progress right away.
+              </p>
 
-          <button type="submit" disabled={isUploading}>
-            {isUploading ? "Uploading..." : "Upload"}
-          </button>
-        </form>
+              <form onSubmit={handleSubmit} className="form">
+                <label htmlFor="file">Document file</label>
+                <input
+                  ref={fileInputRef}
+                  id="file"
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
 
-        <form onSubmit={handleAsk} className="form">
-          <label htmlFor="documentId">Document ID</label>
-          <input
-            id="documentId"
-            type="text"
-            value={documentId}
-            onChange={(e) => setDocumentId(e.target.value)}
-            placeholder="Document ID from upload response"
-          />
+                <button type="submit" disabled={isUploading}>
+                  {isUploading ? "Uploading..." : "Upload Document"}
+                </button>
+              </form>
+            </div>
 
-          <label htmlFor="question">Ask a question</label>
-          <textarea
-            id="question"
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Example: What are the key compliance risks in this policy?"
-            rows={4}
-          />
+            <div className="workspace-panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Step 2</p>
+                  <h2>Ask a question</h2>
+                </div>
+                <span className="panel-note">Ready after processing completes</span>
+              </div>
+              <p className="muted">
+                Ask about risks, responsibilities, exclusions, or any other important part of the document.
+              </p>
 
-          <button type="submit" disabled={isAsking}>
-            {isAsking ? "Asking..." : "Ask PolicyMind"}
-          </button>
-        </form>
+              <form onSubmit={handleAsk} className="form">
+                <label htmlFor="documentId">Document ID</label>
+                <input
+                  id="documentId"
+                  type="text"
+                  value={documentId}
+                  onChange={(e) => setDocumentId(e.target.value)}
+                  placeholder="Document ID from upload response"
+                />
+
+                <label htmlFor="question">Your question</label>
+                <textarea
+                  id="question"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Example: What are the key compliance risks in this policy?"
+                  rows={4}
+                />
+
+                <button type="submit" disabled={isAsking}>
+                  {isAsking ? "Reviewing..." : "Ask PolicyMind"}
+                </button>
+              </form>
+            </div>
+          </section>
+
+          <aside className="workspace-sidebar">
+            <div className="workspace-panel sidebar-panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Live Status</p>
+                  <h2>Document progress</h2>
+                </div>
+              </div>
+              <div className="status-stack">
+                <div className="status-row">
+                  <span>Status</span>
+                  <strong>{statusLabel}</strong>
+                </div>
+                <div className="status-row">
+                  <span>Document ID</span>
+                  <strong>{documentStatus?.documentId || documentId || "Not assigned yet"}</strong>
+                </div>
+                <div className="status-row">
+                  <span>File name</span>
+                  <strong>{documentStatus?.fileName || file?.name || "No file selected"}</strong>
+                </div>
+                <div className="status-row">
+                  <span>Chunks</span>
+                  <strong>{documentStatus?.chunksStored ?? 0}</strong>
+                </div>
+                <div className="status-row">
+                  <span>Completed</span>
+                  <strong>{documentStatus?.completedAt || "In progress"}</strong>
+                </div>
+              </div>
+              <button type="button" className="secondary" onClick={() => loadDocumentStatus(documentId)} disabled={!documentId}>
+                Refresh Status
+              </button>
+              {documentStatus?.errorMessage && (
+                <p className="error"><strong>Processing Error:</strong> {documentStatus.errorMessage}</p>
+              )}
+            </div>
+
+            <div className="workspace-panel sidebar-panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Quick Tips</p>
+                  <h2>Best results</h2>
+                </div>
+              </div>
+              <ul className="feature-list compact-list">
+                <li>Use a clean policy, contract, or guideline document.</li>
+                <li>Wait for the status to show completed before asking questions.</li>
+                <li>Ask direct questions like coverage limits, deadlines, or compliance risks.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
 
         {!!documentStatus && (
           <section className="rag-section">
@@ -270,20 +419,32 @@ export default function UploadPage() {
         {(!!rankedAnalysts.length || !!answerData) && (
           <section className="rag-result">
             <div className="rag-head">
-              <h2>PolicyMind Analysis</h2>
+              <div>
+                <p className="eyebrow">Review Results</p>
+                <h2>PolicyMind Analysis</h2>
+              </div>
+              {leadAnalyst && (
+                <div className="rag-badges">
+                  <span className="badge">Top Risk Score: {leadAnalyst.response?.risk_score ?? "N/A"}</span>
+                  <span className="badge">Confidence: {normalizeConfidence(leadAnalyst.response?.confidence)}</span>
+                </div>
+              )}
             </div>
 
             {!rankedAnalysts.length && (
               <div className="rag-section">
-                <h3>Analyst Status</h3>
-                <p>Our analysts are not able to answer this question.</p>
+                <h3>No review available yet</h3>
+                <p>We could not generate a clear answer yet. Try a more specific question or make sure the document has finished processing.</p>
               </div>
             )}
 
             {rankedAnalysts.map((analyst, idx) => (
-              <div className="rag-section" key={`analyst-${analyst.source}`}>
+              <div className="rag-section analyst-card" key={`analyst-${analyst.source}`}>
                 <div className="rag-head">
-                  <h3>Analyst {idx + 1}</h3>
+                  <div>
+                    <p className="eyebrow">Analyst {idx + 1}</p>
+                    <h3>{analyst.source === "openai" ? "Primary Review" : "Secondary Review"}</h3>
+                  </div>
                   <div className="rag-badges">
                     <span className="badge">Risk Score: {analyst.response?.risk_score ?? "N/A"}</span>
                     <span className="badge">
@@ -291,35 +452,53 @@ export default function UploadPage() {
                     </span>
                   </div>
                 </div>
+                <div className="analysis-hero-card">
+                  <div>
+                    <p className="analysis-label">Quick take</p>
+                    <p className="analysis-summary">{analyst.response?.summary || "No summary available."}</p>
+                  </div>
+                  <div>
+                    <p className="analysis-label">Detailed answer</p>
+                    <p className="analysis-answer">{analyst.response?.answer || "No answer available."}</p>
+                  </div>
+                </div>
                 <div className="rag-grid">
-                  <div className="rag-section">
-                    <h3>Summary and Answer</h3>
-                    <p><strong>Summary:</strong> {analyst.response?.summary || "No summary available."}</p>
-                    <p><strong>Answer:</strong> {analyst.response?.answer || "No answer available."}</p>
-                  </div>
-                  <div className="rag-section">
+                  <div className="rag-section insight-card">
                     <h3>Key Risks</h3>
-                    <ul>
-                      {(analyst.response?.key_risks || []).map((risk, riskIdx) => (
-                        <li key={`risk-${idx}-${riskIdx}`}>{risk}</li>
-                      ))}
-                    </ul>
+                    {(analyst.response?.key_risks || []).length ? (
+                      <ul>
+                        {(analyst.response?.key_risks || []).map((risk, riskIdx) => (
+                          <li key={`risk-${idx}-${riskIdx}`}>{risk}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>No major risks stood out in this review.</p>
+                    )}
                   </div>
-                  <div className="rag-section">
+                  <div className="rag-section insight-card">
                     <h3>Recommended Actions</h3>
-                    <ul>
-                      {(analyst.response?.recommended_actions || []).map((action, actionIdx) => (
-                        <li key={`action-${idx}-${actionIdx}`}>{action}</li>
-                      ))}
-                    </ul>
+                    {(analyst.response?.recommended_actions || []).length ? (
+                      <ul>
+                        {(analyst.response?.recommended_actions || []).map((action, actionIdx) => (
+                          <li key={`action-${idx}-${actionIdx}`}>{action}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>No immediate follow-up actions were suggested.</p>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
 
             {!!answerData?.retrievedChunkPreviews?.length && (
-              <div className="rag-section">
-                <h3>Retrieved Evidence</h3>
+              <div className="rag-section evidence-panel">
+                <div className="panel-head">
+                  <div>
+                    <p className="eyebrow">Supporting Evidence</p>
+                    <h3>What the answer was based on</h3>
+                  </div>
+                </div>
                 {answerData.retrievedChunkPreviews.map((preview, idx) => (
                   <article className="evidence-card" key={`chunk-${idx}`}>
                     <strong>{answerData.retrievedLineRanges?.[idx] || `Line reference ${idx + 1}`}</strong>
@@ -334,11 +513,11 @@ export default function UploadPage() {
         <div className="metrics-row upload-bottom-metrics">
           <div className="metric-card">
             <strong>Pipeline</strong>
-            <span>Upload to Chunk to Embed to Retrieve to Explain</span>
+            <span>Upload, process, search, and answer in one guided flow.</span>
           </div>
           <div className="metric-card">
             <strong>Architecture</strong>
-            <span>Microservices + Redis cache + vector search</span>
+            <span>Fast, reliable document review powered by secure services.</span>
           </div>
           <div className="metric-card">
             <strong>Audience</strong>
