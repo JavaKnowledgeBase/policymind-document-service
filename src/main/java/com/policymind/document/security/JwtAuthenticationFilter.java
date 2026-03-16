@@ -33,15 +33,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
             throws ServletException, IOException {
 
+        final String requestUri = request.getRequestURI();
+        final boolean traceAuth = shouldTraceAuth(requestUri);
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            if (traceAuth) {
+                logger.info(
+                        "No bearer token present for path='{}', method='{}', uploadRequestId='{}', questionRequestId='{}'",
+                        requestUri,
+                        request.getMethod(),
+                        request.getHeader("X-Upload-Request-Id"),
+                        request.getHeader("X-Question-Request-Id")
+                );
+            }
             filterChain.doFilter(request, response);
             return;
         }
 
         String jwt = normalizeBearerToken(authHeader.substring(7));
         if (jwt.isEmpty()) {
+            if (traceAuth) {
+                logger.warn(
+                        "Bearer token normalized to empty for path='{}', method='{}'",
+                        requestUri,
+                        request.getMethod()
+                );
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -65,13 +83,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         );
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (traceAuth) {
+                    logger.info(
+                            "JWT accepted for path='{}', method='{}', username='{}', role='{}'",
+                            requestUri,
+                            request.getMethod(),
+                            username,
+                            role
+                    );
+                }
             }
         } catch (JwtException | IllegalArgumentException ex) {
             SecurityContextHolder.clearContext();
-            logger.warn("Rejecting malformed JWT for path '{}': {}", request.getRequestURI(), ex.getMessage());
+            logger.warn("Rejecting malformed JWT for path '{}': {}", requestUri, ex.getMessage());
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean shouldTraceAuth(String requestUri) {
+        if (requestUri == null) {
+            return false;
+        }
+        return requestUri.equals("/upload")
+                || requestUri.startsWith("/documents/")
+                || requestUri.endsWith("/ask");
     }
 
     private String normalizeBearerToken(String token) {

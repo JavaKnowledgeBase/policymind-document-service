@@ -3,6 +3,8 @@ package com.policymind.document.security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -20,6 +22,8 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
@@ -53,6 +57,33 @@ public class SecurityConfig {
                 .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
                 .successHandler(oAuth2AuthenticationSuccessHandler)
                 .failureHandler(oAuth2AuthenticationFailureHandler)
+            )
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, authException) -> {
+                    logger.warn(
+                            "Unauthorized request blocked, method='{}', path='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
+                            request.getMethod(),
+                            request.getRequestURI(),
+                            request.getHeader("Authorization") != null,
+                            request.getHeader("X-Upload-Request-Id"),
+                            request.getHeader("X-Question-Request-Id"),
+                            authException.getMessage()
+                    );
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage());
+                })
+                .accessDeniedHandler((request, response, accessDeniedException) -> {
+                    logger.warn(
+                            "Forbidden request blocked, method='{}', path='{}', principal='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
+                            request.getMethod(),
+                            request.getRequestURI(),
+                            request.getUserPrincipal() == null ? null : request.getUserPrincipal().getName(),
+                            request.getHeader("Authorization") != null,
+                            request.getHeader("X-Upload-Request-Id"),
+                            request.getHeader("X-Question-Request-Id"),
+                            accessDeniedException.getMessage()
+                    );
+                    response.sendError(HttpServletResponse.SC_FORBIDDEN, accessDeniedException.getMessage());
+                })
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .sessionManagement(session ->

@@ -2,6 +2,7 @@
 package com.policymind.document.controller;
 
 import com.policymind.document.exception.DocumentProcessingException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
@@ -32,9 +33,14 @@ public class DocumentController {
 
 	// Upload returns immediately and lets the worker finish parsing/chunking/embedding in the background.
 	@PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
+                                                      @RequestHeader(value = "X-Upload-Request-Id", required = false) String uploadRequestId,
+                                                      HttpServletRequest request) {
         logger.info(
-                "Upload request received, fileName='{}', contentType='{}', sizeBytes={}",
+                "Upload request received, uploadRequestId='{}', path='{}', remoteAddr='{}', fileName='{}', contentType='{}', sizeBytes={}",
+                uploadRequestId,
+                request == null ? null : request.getRequestURI(),
+                request == null ? null : request.getRemoteAddr(),
                 file == null ? null : file.getOriginalFilename(),
                 file == null ? null : file.getContentType(),
                 file == null ? null : file.getSize()
@@ -52,6 +58,7 @@ public class DocumentController {
 	public ResponseEntity<Map<String, Object>> askQuestion(
 	        @PathVariable Long id,
 	        @RequestBody(required = false) Map<String, Object> payload,
+            @RequestHeader(value = "X-Question-Request-Id", required = false) String questionRequestId,
             @RequestParam(required = false) String question,
             @RequestParam(required = false) String embeddingProvider,
             @RequestParam(required = false) String answerProvider) {
@@ -64,6 +71,14 @@ public class DocumentController {
         if (finalQuestion == null || finalQuestion.isBlank()) {
             return noStore(HttpStatus.BAD_REQUEST, Map.of("error", "Question is required"));
         }
+
+        logger.info(
+                "Question request received, questionRequestId='{}', documentId={}, embeddingProvider='{}', answerProvider='{}'",
+                questionRequestId,
+                id,
+                embeddingProvider,
+                answerProvider
+        );
 
         String finalEmbeddingProvider = embeddingProvider;
         if ((finalEmbeddingProvider == null || finalEmbeddingProvider.isBlank()) && payload != null && payload.get("embeddingProvider") != null) {
