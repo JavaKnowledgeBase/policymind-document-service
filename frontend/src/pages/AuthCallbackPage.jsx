@@ -3,6 +3,17 @@ import { useLocation, useNavigate } from "react-router-dom";
 import BrandBar from "../components/BrandBar";
 import DeveloperCredit from "../components/DeveloperCredit";
 
+function normalizeToken(token) {
+  if (!token) {
+    return "";
+  }
+
+  return String(token)
+    .trim()
+    .replace(/^Bearer\s+/i, "")
+    .trim();
+}
+
 export default function AuthCallbackPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -15,7 +26,12 @@ export default function AuthCallbackPage() {
     const reason = params.get("reason");
 
     if (token) {
-      localStorage.setItem("authToken", token);
+      const normalizedToken = normalizeToken(token);
+      if (normalizedToken) {
+        localStorage.setItem("authToken", normalizedToken);
+      } else {
+        localStorage.removeItem("authToken");
+      }
       navigate("/upload", { replace: true });
       return;
     }
