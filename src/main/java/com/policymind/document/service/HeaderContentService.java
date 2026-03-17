@@ -26,10 +26,10 @@ public class HeaderContentService {
 
     private final StringRedisTemplate redisTemplate;
 
-    @Value("${app.header-content.csv-path:resource_docs/contracts_policies_jokes.csv}")
+    @Value("${app.header-content.csv-path:resource_docs/policymind_header_lines.csv}")
     private String csvPath;
 
-    @Value("${app.header-content.redis-key:policymind:header-content}")
+    @Value("${app.header-content.redis-key:policymind:header-content:v2}")
     private String redisKey;
 
     private volatile List<String> inMemoryCache = List.of(
