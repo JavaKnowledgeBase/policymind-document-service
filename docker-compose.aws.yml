@@ -64,5 +64,14 @@ services:
       - policymind
     restart: unless-stopped
 
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: policymind_dozzle
+    ports:
+      - "${DOZZLE_PORT:-8088}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
 volumes:
   postgres_data:
