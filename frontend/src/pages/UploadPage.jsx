@@ -76,6 +76,7 @@ export default function UploadPage() {
   const [isAsking, setIsAsking] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const workspaceTopRef = useRef(null);
   const fileInputRef = useRef(null);
   const uploadRequestIdRef = useRef(0);
   const statusRequestIdRef = useRef(0);
@@ -112,6 +113,16 @@ export default function UploadPage() {
   const handleLogout = () => {
     localStorage.removeItem("authToken");
     navigate("/");
+  };
+
+  const scrollToWorkspaceTop = () => {
+    window.requestAnimationFrame(() => {
+      if (workspaceTopRef.current) {
+        workspaceTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const loadDocumentStatus = async (id) => {
@@ -185,6 +196,7 @@ export default function UploadPage() {
         setMessage(
           `${fileName} has been uploaded. Document ID: ${documentId}. We are processing it now in the background.`
         );
+        scrollToWorkspaceTop();
       }
     } catch (err) {
       if (requestId !== uploadRequestIdRef.current) {
@@ -257,7 +269,7 @@ export default function UploadPage() {
     <main className="page">
       <div className="page-orb page-orb-left" aria-hidden="true" />
       <div className="page-orb page-orb-right" aria-hidden="true" />
-      <section className="card card-wide">
+      <section ref={workspaceTopRef} className="card card-wide">
         <BrandBar />
         <div className="workspace-hero">
           <div>
