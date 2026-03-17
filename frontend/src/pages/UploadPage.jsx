@@ -454,7 +454,7 @@ export default function UploadPage() {
               <div className="rag-section analyst-card" key={`analyst-${analyst.source}`}>
                 <div className="rag-head">
                   <div>
-                    <p className="eyebrow">Analyst {idx + 1}</p>
+                    <p className="eyebrow">Analyst {idx + 1} Opinion</p>
                     <h3>{analyst.source === "openai" ? "Primary Review" : "Secondary Review"}</h3>
                   </div>
                   <div className="rag-badges">
