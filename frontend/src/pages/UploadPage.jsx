@@ -9,6 +9,8 @@ const CONFIDENCE_RANK = {
   medium: 2,
   low: 1
 };
+const MAX_UPLOAD_SIZE_MB = 50;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
 function normalizeConfidence(confidence) {
   if (!confidence) {
@@ -66,7 +68,34 @@ function toStatusTone(status) {
   return "neutral";
 }
 
+function normalizeProcessingErrorMessage(message) {
+  const text = String(message || "").trim();
+  if (!text) {
+    return "";
+  }
+
+  if (text === "No readable text extracted from the uploaded file.") {
+    return "We could not find readable text in that PDF. It may be a scanned or image-only file, so please try a searchable PDF or run OCR first.";
+  }
+
+  return text;
+}
+
+function normalizeUploadErrorMessage(statusCode, message, fileName) {
+  if (statusCode === 413) {
+    return `“${fileName || "This file"}” is larger than the current upload limit. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`;
+  }
+
+  if (String(message || "").includes("Only PDF files are supported right now.")) {
+    return "Only PDF files are supported right now. Please choose a .pdf file.";
+  }
+
+  return message || "The upload did not finish successfully.";
+}
+
 export default function UploadPage() {
+  const supportedFileMessage = "Only PDF files are supported right now.";
+  const [activeStep, setActiveStep] = useState(1);
   const [file, setFile] = useState(null);
   const [documentId, setDocumentId] = useState("");
   const [question, setQuestion] = useState("");
@@ -77,16 +106,21 @@ export default function UploadPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const workspaceTopRef = useRef(null);
+  const stepTwoRef = useRef(null);
+  const questionInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const uploadRequestIdRef = useRef(0);
   const statusRequestIdRef = useRef(0);
   const askRequestIdRef = useRef(0);
+  const shouldScrollToStepTwoRef = useRef(false);
   const navigate = useNavigate();
   const openAiResponse = answerData?.providers?.openai || answerData?.structuredOutput || null;
   const vertexResponse = answerData?.providers?.vertex || null;
   const statusLabel = documentStatus?.status || "Waiting for upload";
   const statusTone = toStatusTone(documentStatus?.status);
   const canAskQuestion = Boolean(documentId && documentStatus?.status === "COMPLETED");
+  const processingErrorMessage = normalizeProcessingErrorMessage(documentStatus?.errorMessage);
+  const hasFailedDocument = documentStatus?.status === "FAILED";
 
   const rankedAnalysts = [
     openAiResponse && { source: "openai", response: openAiResponse },
@@ -115,13 +149,37 @@ export default function UploadPage() {
     navigate("/");
   };
 
-  const scrollToWorkspaceTop = () => {
+  const scrollToStepTwo = ({ focusQuestion = false } = {}) => {
     window.requestAnimationFrame(() => {
-      if (workspaceTopRef.current) {
-        workspaceTopRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (stepTwoRef.current) {
+        stepTwoRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (focusQuestion) {
+          window.setTimeout(() => {
+            questionInputRef.current?.focus();
+          }, 350);
+        }
         return;
       }
       window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
+  const resetSelectedFile = () => {
+    setFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const chooseAnotherFile = () => {
+    setMessage("");
+    setError("");
+    setDocumentStatus(null);
+    setDocumentId("");
+    setActiveStep(1);
+    resetSelectedFile();
+    window.requestAnimationFrame(() => {
+      fileInputRef.current?.click();
     });
   };
 
@@ -151,6 +209,21 @@ export default function UploadPage() {
     return () => window.clearInterval(intervalId);
   }, [documentId, documentStatus]);
 
+  useEffect(() => {
+    if (canAskQuestion) {
+      setActiveStep(2);
+    }
+  }, [canAskQuestion]);
+
+  useEffect(() => {
+    if (!shouldScrollToStepTwoRef.current || activeStep !== 2) {
+      return;
+    }
+
+    shouldScrollToStepTwoRef.current = false;
+    scrollToStepTwo();
+  }, [activeStep, documentStatus]);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setMessage("");
@@ -163,12 +236,35 @@ export default function UploadPage() {
       return;
     }
 
+    if (!String(file.name || "").toLowerCase().endsWith(".pdf")) {
+      resetSelectedFile();
+      setError(`${supportedFileMessage} Please choose a .pdf file.`);
+      return;
+    }
+
+    if ((file.size || 0) > MAX_UPLOAD_SIZE_BYTES) {
+      resetSelectedFile();
+      setError(`“${file.name || "This file"}” is too large. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`);
+      return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     const requestId = ++uploadRequestIdRef.current;
 
     try {
       setIsUploading(true);
+      shouldScrollToStepTwoRef.current = true;
+      setActiveStep(2);
+      setDocumentStatus({
+        documentId: null,
+        fileName: file.name || "document",
+        status: "UPLOADING",
+        chunksStored: 0,
+        completedAt: null,
+        errorMessage: null
+      });
+      setMessage(`Uploading ${file.name || "your document"} now. We will keep the live processing status updated here.`);
       const response = await client.post("/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -191,12 +287,13 @@ export default function UploadPage() {
           documentId: data?.documentId ?? null,
           fileName,
           status: data?.status || "QUEUED",
-          chunksStored: data?.chunksStored ?? 0
+          chunksStored: data?.chunksStored ?? 0,
+          completedAt: null,
+          errorMessage: null
         });
         setMessage(
           `${fileName} has been uploaded. Document ID: ${documentId}. We are processing it now in the background.`
         );
-        scrollToWorkspaceTop();
       }
     } catch (err) {
       if (requestId !== uploadRequestIdRef.current) {
@@ -204,16 +301,23 @@ export default function UploadPage() {
       }
       const statusCode = err.response?.status;
       const apiError = err.response?.data?.error;
-      const detail = apiError || err.message || "The upload did not finish successfully.";
+      const detail = normalizeUploadErrorMessage(statusCode, apiError || err.message, file?.name);
+      shouldScrollToStepTwoRef.current = true;
+      setActiveStep(2);
+      setDocumentStatus({
+        documentId: null,
+        fileName: file?.name || "document",
+        status: "FAILED",
+        chunksStored: 0,
+        completedAt: null,
+        errorMessage: detail
+      });
       setError(statusCode ? `We could not upload that file (${statusCode}). ${detail}` : detail);
     } finally {
       if (requestId === uploadRequestIdRef.current) {
         setIsUploading(false);
       }
-      setFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      resetSelectedFile();
     }
   };
 
@@ -287,16 +391,16 @@ export default function UploadPage() {
 
         <div className="workspace-grid">
           <section className="workspace-main">
-            <div className="workspace-panel">
+            <div className={`workspace-panel step-panel ${activeStep === 1 ? "step-panel-active" : ""}`}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">Step 1</p>
                   <h2>Upload a document</h2>
                 </div>
-                <span className="panel-note">PDF, Word, or text files</span>
+                <span className="panel-note">PDF files only</span>
               </div>
               <p className="muted">
-                Choose a file and we will start processing it in the background so you can track progress right away.
+                Choose a PDF and we will start processing it in the background so you can track progress right away.
               </p>
 
               <form onSubmit={handleSubmit} className="form">
@@ -305,27 +409,67 @@ export default function UploadPage() {
                   ref={fileInputRef}
                   id="file"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  accept=".pdf,application/pdf"
+                  onChange={(e) => {
+                    setError("");
+                    setMessage("");
+                    setDocumentStatus(null);
+                    setFile(e.target.files?.[0] || null);
+                  }}
                 />
+                <p className="muted">
+                  {supportedFileMessage} Upload limit: {MAX_UPLOAD_SIZE_MB} MB.
+                </p>
 
-                <button type="submit" disabled={isUploading}>
+                <button type="submit" disabled={isUploading || !file}>
                   {isUploading ? "Uploading..." : "Upload Document"}
                 </button>
+                {(error || hasFailedDocument) && (
+                  <button type="button" className="secondary subtle-button" onClick={chooseAnotherFile}>
+                    Choose Another File
+                  </button>
+                )}
               </form>
             </div>
 
-            <div className="workspace-panel">
+            <div ref={stepTwoRef} className={`workspace-panel step-panel ${activeStep === 2 ? "step-panel-active" : ""}`}>
               <div className="panel-head">
                 <div>
                   <p className="eyebrow">Step 2</p>
                   <h2>Ask a question</h2>
                 </div>
-                <span className="panel-note">Ready after processing completes</span>
+                <span className="panel-note">
+                  {documentStatus
+                    ? canAskQuestion
+                      ? "Ready for questions"
+                      : `Status: ${statusLabel}`
+                    : "Ready after processing completes"}
+                </span>
               </div>
               <p className="muted">
                 Ask about risks, responsibilities, exclusions, or any other important part of the document.
               </p>
+
+              {!!documentStatus && (
+                <div className={`step-status-card step-status-${statusTone}`}>
+                  <div className="step-status-head">
+                    <strong>{documentStatus.fileName || file?.name || "Document"}</strong>
+                    <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>
+                  </div>
+                  <p>
+                    {documentStatus.documentId
+                      ? `Document ID ${documentStatus.documentId} is ${statusLabel.toLowerCase()}.`
+                      : hasFailedDocument
+                        ? "This file could not be uploaded successfully. Please remove it and choose another file."
+                        : "We are uploading your file and will attach the document ID as soon as the server responds."}
+                  </p>
+                  {hasFailedDocument && (
+                    <button type="button" className="secondary subtle-button" onClick={chooseAnotherFile}>
+                      Remove File And Try Another
+                    </button>
+                  )}
+                </div>
+              )}
 
               <form onSubmit={handleAsk} className="form">
                 <label htmlFor="documentId">Document ID</label>
@@ -339,6 +483,7 @@ export default function UploadPage() {
 
                 <label htmlFor="question">Your question</label>
                 <textarea
+                  ref={questionInputRef}
                   id="question"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
@@ -386,8 +531,8 @@ export default function UploadPage() {
               <button type="button" className="secondary" onClick={() => loadDocumentStatus(documentId)} disabled={!documentId}>
                 Refresh Status
               </button>
-              {documentStatus?.errorMessage && (
-                <p className="error"><strong>Processing Error:</strong> {documentStatus.errorMessage}</p>
+              {processingErrorMessage && (
+                <p className="error"><strong>Processing Error:</strong> {processingErrorMessage}</p>
               )}
             </div>
 
@@ -419,7 +564,7 @@ export default function UploadPage() {
             <p><strong>Document ID:</strong> {documentStatus.documentId || documentId}</p>
             <p><strong>File:</strong> {documentStatus.fileName || "document"}</p>
             {documentStatus.completedAt && <p><strong>Completed:</strong> {documentStatus.completedAt}</p>}
-            {documentStatus.errorMessage && <p className="error"><strong>Processing Error:</strong> {documentStatus.errorMessage}</p>}
+            {processingErrorMessage && <p className="error"><strong>Processing Error:</strong> {processingErrorMessage}</p>}
             <button type="button" className="secondary" onClick={() => loadDocumentStatus(documentId)}>
               Refresh Status
             </button>

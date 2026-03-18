@@ -18,6 +18,8 @@ import java.util.Map;
 public class DocumentProcessingPipeline {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentProcessingPipeline.class);
+    static final String NO_READABLE_TEXT_MESSAGE =
+            "We could not find readable text in that PDF. It may be a scanned or image-only file, so please try a searchable PDF or run OCR first.";
 
     private final PdfService pdfService;
     private final DocumentRepository repository;
@@ -60,7 +62,7 @@ public class DocumentProcessingPipeline {
             stage = "extract PDF text";
             String text = pdfService.extractText(fileBytes);
             if (text == null || text.isBlank()) {
-                throw new IllegalStateException("No readable text extracted from the uploaded file.");
+                throw new IllegalStateException(NO_READABLE_TEXT_MESSAGE);
             }
             logger.info("Text extraction completed for documentId={}, characters={}", savedDoc.getId(), text.length());
 

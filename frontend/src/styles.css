@@ -204,6 +204,16 @@ body {
   box-shadow: 0 14px 30px rgba(17, 32, 49, 0.08);
 }
 
+.step-panel {
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.step-panel-active {
+  border-color: rgba(20, 108, 99, 0.34);
+  box-shadow: 0 18px 34px rgba(20, 108, 99, 0.16);
+  transform: translateY(-2px);
+}
+
 .sidebar-panel {
   position: sticky;
   top: 20px;
@@ -263,6 +273,51 @@ body {
   display: grid;
   gap: 10px;
   margin: 12px 0 14px;
+}
+
+.step-status-card {
+  margin: 10px 0 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(121, 145, 163, 0.16);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.step-status-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.step-status-head strong {
+  font-size: 14px;
+}
+
+.step-status-card p {
+  margin: 0;
+  color: #334155;
+}
+
+.step-status-success {
+  border-color: rgba(34, 197, 94, 0.22);
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.step-status-warning {
+  border-color: rgba(245, 158, 11, 0.24);
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.step-status-danger {
+  border-color: rgba(239, 68, 68, 0.24);
+  background: linear-gradient(180deg, rgba(254, 242, 242, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.step-status-neutral {
+  border-color: rgba(59, 130, 246, 0.2);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .status-row {
@@ -555,6 +610,11 @@ button:disabled {
 
 .secondary {
   background: linear-gradient(135deg, var(--slate) 0%, #465b73 100%);
+}
+
+.subtle-button {
+  justify-self: start;
+  box-shadow: none;
 }
 
 .metrics-row {
