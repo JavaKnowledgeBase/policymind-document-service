@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import AuthShell from "../components/AuthShell";
-import { executeRecaptcha, isRecaptchaEnabled, preloadRecaptcha } from "../lib/recaptcha";
+import { executeRecaptcha, preloadRecaptcha } from "../lib/recaptcha";
 
 const EMPTY_REGISTER_FORM = {
   username: "",

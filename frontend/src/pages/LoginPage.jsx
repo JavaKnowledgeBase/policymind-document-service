@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import AuthShell from "../components/AuthShell";
-import { executeRecaptcha, isRecaptchaEnabled, preloadRecaptcha } from "../lib/recaptcha";
+import { executeRecaptcha, preloadRecaptcha } from "../lib/recaptcha";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");

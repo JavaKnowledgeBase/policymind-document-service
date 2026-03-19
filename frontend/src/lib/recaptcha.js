@@ -2,20 +2,35 @@ const RECAPTCHA_SITE_KEY = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "";
 const RECAPTCHA_SCRIPT_ID = "google-recaptcha-v3";
 
 function hasRecaptcha() {
-  return typeof window !== "undefined" && typeof window.grecaptcha !== "undefined";
+  return typeof window !== "undefined"
+    && typeof window.grecaptcha !== "undefined"
+    && typeof window.grecaptcha.ready === "function"
+    && typeof window.grecaptcha.execute === "function";
 }
 
 function injectScript() {
-  if (document.getElementById(RECAPTCHA_SCRIPT_ID)) {
-    return;
-  }
+  return new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID);
+    if (existingScript) {
+      if (hasRecaptcha()) {
+        resolve();
+        return;
+      }
 
-  const script = document.createElement("script");
-  script.id = RECAPTCHA_SCRIPT_ID;
-  script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`;
-  script.async = true;
-  script.defer = true;
-  document.head.appendChild(script);
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("reCAPTCHA script failed to load.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = RECAPTCHA_SCRIPT_ID;
+    script.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(RECAPTCHA_SITE_KEY)}`;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener("load", resolve, { once: true });
+    script.addEventListener("error", () => reject(new Error("reCAPTCHA script failed to load.")), { once: true });
+    document.head.appendChild(script);
+  });
 }
 
 function waitForRecaptcha(timeoutMs = 10000) {
@@ -25,7 +40,7 @@ function waitForRecaptcha(timeoutMs = 10000) {
       return;
     }
 
-    injectScript();
+    injectScript().catch(reject);
 
     const startedAt = Date.now();
     const poll = () => {
@@ -55,7 +70,7 @@ export function preloadRecaptcha() {
     return;
   }
 
-  injectScript();
+  injectScript().catch(() => {});
 }
 
 export async function executeRecaptcha(action) {
@@ -69,13 +84,15 @@ export async function executeRecaptcha(action) {
   }
 
   return new Promise((resolve, reject) => {
-    grecaptcha.ready(async () => {
-      try {
-        const token = await grecaptcha.execute(RECAPTCHA_SITE_KEY, { action });
-        resolve(token || "");
-      } catch (error) {
-        reject(error);
+    grecaptcha.ready(() => {
+      if (typeof grecaptcha.execute !== "function") {
+        reject(new Error("reCAPTCHA is not ready yet."));
+        return;
       }
+
+      grecaptcha.execute(RECAPTCHA_SITE_KEY, { action })
+        .then((token) => resolve(token || ""))
+        .catch((error) => reject(error));
     });
   });
 }
