@@ -6,6 +6,7 @@ public class AuthRegisterRequest {
     private String password;
     private String securityQuestion;
     private String securityAnswer;
+    private String recaptchaToken;
 
     public String getUsername() {
         return username;
@@ -37,5 +38,13 @@ public class AuthRegisterRequest {
 
     public void setSecurityAnswer(String securityAnswer) {
         this.securityAnswer = securityAnswer;
+    }
+
+    public String getRecaptchaToken() {
+        return recaptchaToken;
+    }
+
+    public void setRecaptchaToken(String recaptchaToken) {
+        this.recaptchaToken = recaptchaToken;
     }
 }

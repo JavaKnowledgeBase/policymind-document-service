@@ -52,4 +52,13 @@ public class DocumentServiceEmptyFileTest {
 
         assertThrows(DocumentProcessingException.class, () -> documentService.submitDocument(empty));
     }
+
+    @Test
+    public void submitDocument_nonPdf_throwsHelpfulMessage() {
+        MockMultipartFile textFile = new MockMultipartFile("file", "notes.txt", "text/plain", "hello".getBytes());
+
+        DocumentProcessingException ex = assertThrows(DocumentProcessingException.class, () -> documentService.submitDocument(textFile));
+
+        assertEquals("Only PDF files are supported right now. Please upload a .pdf file.", ex.getMessage());
+    }
 }

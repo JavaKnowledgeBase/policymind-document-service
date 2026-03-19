@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import AuthShell from "../components/AuthShell";
+import { executeRecaptcha, isRecaptchaEnabled, preloadRecaptcha } from "../lib/recaptcha";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -26,6 +27,10 @@ export default function LoginPage() {
     }
   }, [location.search]);
 
+  useEffect(() => {
+    preloadRecaptcha();
+  }, []);
+
   const clearMessages = () => {
     setError("");
     setSuccessMessage("");
@@ -42,9 +47,11 @@ export default function LoginPage() {
 
     try {
       setIsLoading(true);
+      const recaptchaToken = await executeRecaptcha("login");
       const response = await client.post("/auth/login/password", {
         username: username.trim(),
-        password: password.trim()
+        password: password.trim(),
+        recaptchaToken
       });
       localStorage.setItem("authToken", response.data.token);
       navigate("/upload");

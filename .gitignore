@@ -20,6 +20,7 @@ postgres_data/
 # Environment
 .env
 .env.production
+frontend/.env.local
 
 # Local diagnostics and credentials
 .tmp_diag.txt

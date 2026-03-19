@@ -100,6 +100,12 @@ gcp:
 app:
   oauth2:
     redirect-uri: ${FRONTEND_OAUTH_CALLBACK_URL:http://localhost:5173/auth/callback}
+  recaptcha:
+    enabled: ${APP_RECAPTCHA_ENABLED:false}
+    site-key: ${APP_RECAPTCHA_SITE_KEY:}
+    secret-key: ${APP_RECAPTCHA_SECRET_KEY:}
+    min-score: ${APP_RECAPTCHA_MIN_SCORE:0.2}
+    verify-url: ${APP_RECAPTCHA_VERIFY_URL:https://www.google.com/recaptcha/api/siteverify}
   header-content:
     csv-path: ${HEADER_CONTENT_CSV_PATH:resource_docs/contracts_policies_jokes.csv}
     redis-key: ${HEADER_CONTENT_REDIS_KEY:policymind:header-content}

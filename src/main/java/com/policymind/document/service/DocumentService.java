@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class DocumentService {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
+    private static final String UNSUPPORTED_FILE_MESSAGE = "Only PDF files are supported right now. Please upload a .pdf file.";
 
     private final DocumentRepository repository;
     private final DocumentChunkRepository chunkRepository;
@@ -61,6 +62,7 @@ public class DocumentService {
             logger.warn("processDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
         }
+        validateSupportedFile(file);
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "PROCESSING");
         byte[] fileBytes = readFileBytes(file, savedDoc.getId());
@@ -84,6 +86,7 @@ public class DocumentService {
             logger.warn("submitDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
         }
+        validateSupportedFile(file);
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "QUEUED");
         byte[] fileBytes = readFileBytes(file, savedDoc.getId());
@@ -333,6 +336,19 @@ public class DocumentService {
                     e
             );
             throw new DocumentProcessingException("Failed to read uploaded file bytes.", e);
+        }
+    }
+
+    private void validateSupportedFile(MultipartFile file) {
+        String fileName = file == null ? null : file.getOriginalFilename();
+        String normalizedFileName = fileName == null ? "" : fileName.trim().toLowerCase();
+        if (!normalizedFileName.endsWith(".pdf")) {
+            logger.warn(
+                    "Rejected unsupported upload, fileName='{}', contentType='{}'",
+                    fileName,
+                    file == null ? null : file.getContentType()
+            );
+            throw new DocumentProcessingException(UNSUPPORTED_FILE_MESSAGE);
         }
     }
 }

@@ -53,6 +53,20 @@ function Invoke-FrontendBuild {
     }
 }
 
+function ConvertTo-CmdArgument {
+    param([string]$Value)
+
+    if ($null -eq $Value) {
+        return '""'
+    }
+
+    if ($Value -notmatch '[\s"]') {
+        return $Value
+    }
+
+    return '"' + ($Value -replace '"', '""') + '"'
+}
+
 $mavenCmd = Resolve-MavenCommand
 
 New-Item -ItemType Directory -Force -Path $mavenRepo | Out-Null
@@ -75,9 +89,32 @@ Write-Host "Maven: $mavenCmd"
 Write-Host "Repo cache: $mavenRepo"
 Write-Host "PDFBox cache: $pdfBoxCache"
 
-& $mavenCmd @mavenArgs
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$mavenStderrPath = Join-Path $repoRoot (".tmp_maven_stderr_{0}.log" -f ([guid]::NewGuid().ToString("N")))
+$mavenArgLine = (($mavenArgs | ForEach-Object { ConvertTo-CmdArgument $_ }) -join " ")
+$mavenCmdLine = '"' + $mavenCmd + '" ' + $mavenArgLine + ' 2> "' + $mavenStderrPath + '"'
+
+try {
+    & cmd /d /c $mavenCmdLine
+    $mavenExitCode = $LASTEXITCODE
+
+    $mavenStderr = ""
+    if (Test-Path $mavenStderrPath) {
+        $mavenStderr = (Get-Content $mavenStderrPath -Raw).Trim()
+    }
+
+    if ($mavenExitCode -ne 0) {
+        if ($mavenStderr) {
+            Write-Host $mavenStderr
+        }
+        exit $mavenExitCode
+    }
+
+    if ($mavenStderr -and $mavenStderr -ne "Access is denied.") {
+        Write-Host $mavenStderr -ForegroundColor Yellow
+    }
+}
+finally {
+    Remove-Item $mavenStderrPath -ErrorAction SilentlyContinue
 }
 
 if (-not $SkipFrontend -and $FrontendBuild) {

@@ -23,11 +23,16 @@ public class AuthService {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final RecaptchaService recaptchaService;
 
-    public AuthService(UserRepository userRepository, JwtService jwtService, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository,
+                       JwtService jwtService,
+                       PasswordEncoder passwordEncoder,
+                       RecaptchaService recaptchaService) {
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.recaptchaService = recaptchaService;
     }
 
     public Map<String, Object> register(AuthRegisterRequest request) {
@@ -35,11 +40,13 @@ public class AuthService {
         String password = normalizedValue(request.getPassword());
         String securityQuestion = normalizedValue(request.getSecurityQuestion());
         String securityAnswer = normalizedValue(request.getSecurityAnswer());
+        String recaptchaToken = normalizedValue(request.getRecaptchaToken());
 
         validateRequired(username, "Username is required.");
         validateRequired(password, "Password is required.");
         validateRequired(securityQuestion, "Security question is required.");
         validateRequired(securityAnswer, "Security answer is required.");
+        recaptchaService.verifyOrSkip(recaptchaToken, "register");
 
         if (userRepository.findByUsername(username).isPresent()) {
             throw new IllegalArgumentException("Username already exists.");
@@ -65,9 +72,11 @@ public class AuthService {
     public String login(AuthLoginRequest request) {
         String username = normalizedValue(request.getUsername());
         String password = normalizedValue(request.getPassword());
+        String recaptchaToken = normalizedValue(request.getRecaptchaToken());
 
         validateRequired(username, "Username is required.");
         validateRequired(password, "Password is required.");
+        recaptchaService.verifyOrSkip(recaptchaToken, "login");
 
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid username or password."));

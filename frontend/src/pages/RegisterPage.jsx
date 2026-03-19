@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import AuthShell from "../components/AuthShell";
+import { executeRecaptcha, isRecaptchaEnabled, preloadRecaptcha } from "../lib/recaptcha";
 
 const EMPTY_REGISTER_FORM = {
   username: "",
@@ -16,6 +17,10 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  useEffect(() => {
+    preloadRecaptcha();
+  }, []);
+
   const handleRegister = async (event) => {
     event.preventDefault();
     setError("");
@@ -27,11 +32,13 @@ export default function RegisterPage() {
 
     try {
       setIsRegistering(true);
+      const recaptchaToken = await executeRecaptcha("register");
       await client.post("/auth/register", {
         username: form.username.trim(),
         password: form.password.trim(),
         securityQuestion: form.securityQuestion.trim(),
-        securityAnswer: form.securityAnswer.trim()
+        securityAnswer: form.securityAnswer.trim(),
+        recaptchaToken
       });
       navigate("/", {
         replace: true,

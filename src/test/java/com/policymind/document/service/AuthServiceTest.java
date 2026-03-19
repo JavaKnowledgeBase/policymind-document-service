@@ -24,7 +24,8 @@ public class AuthServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         JwtService jwtService = mock(JwtService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder);
+        RecaptchaService recaptchaService = mock(RecaptchaService.class);
+        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder, recaptchaService);
 
         AuthRegisterRequest request = new AuthRegisterRequest();
         request.setUsername("alice");
@@ -38,6 +39,7 @@ public class AuthServiceTest {
 
         Map<String, Object> response = authService.register(request);
 
+        verify(recaptchaService).verifyOrSkip(null, "register");
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(captor.capture());
         User savedUser = captor.getValue();
@@ -54,7 +56,8 @@ public class AuthServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         JwtService jwtService = mock(JwtService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder);
+        RecaptchaService recaptchaService = mock(RecaptchaService.class);
+        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder, recaptchaService);
 
         User user = new User();
         user.setUsername("alice");
@@ -70,6 +73,7 @@ public class AuthServiceTest {
         when(jwtService.generateToken("alice", "USER")).thenReturn("jwt-token");
 
         assertEquals("jwt-token", authService.login(request));
+        verify(recaptchaService).verifyOrSkip(null, "login");
     }
 
     @Test
@@ -77,7 +81,8 @@ public class AuthServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         JwtService jwtService = mock(JwtService.class);
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder);
+        RecaptchaService recaptchaService = mock(RecaptchaService.class);
+        AuthService authService = new AuthService(userRepository, jwtService, passwordEncoder, recaptchaService);
 
         User user = new User();
         user.setUsername("alice");
