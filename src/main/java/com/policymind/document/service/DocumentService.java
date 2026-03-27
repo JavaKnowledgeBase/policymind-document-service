@@ -1,12 +1,12 @@
 package com.policymind.document.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.policymind.document.entity.DocumentChunk;
 import com.policymind.document.exception.DocumentProcessingException;
 import com.policymind.document.model.Document;
 import com.policymind.document.repository.DocumentChunkRepository;
 import com.policymind.document.repository.DocumentRepository;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,6 +25,7 @@ public class DocumentService {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentService.class);
     private static final String UNSUPPORTED_FILE_MESSAGE = "Only PDF files are supported right now. Please upload a .pdf file.";
+    private static final int TOP_K = 3;
 
     private final DocumentRepository repository;
     private final DocumentChunkRepository chunkRepository;
@@ -126,39 +127,13 @@ public class DocumentService {
     }
 
     public Map<String, Object> askQuestion(Long documentId, String question, String embeddingProvider, String answerProvider) {
-        List<DocumentChunk> chunks = chunkRepository.findByDocumentId(documentId);
+        String normalizedEmbeddingProvider = normalizeEmbeddingProvider(embeddingProvider);
+        List<Double> questionEmbedding = embeddingService.generateEmbedding(question, normalizedEmbeddingProvider);
+        List<DocumentChunk> topChunks = findTopChunks(documentId, normalizedEmbeddingProvider, questionEmbedding);
 
-        if (chunks.isEmpty()) {
-            return Map.of("error", "No chunks found for this document.");
-        }
-
-        List<Double> questionEmbedding = embeddingService.generateEmbedding(question, embeddingProvider);
-        Map<DocumentChunk, Double> similarityScores = new HashMap<>();
-
-        for (DocumentChunk chunk : chunks) {
-            if (chunk.getEmbedding() == null) {
-                continue;
-            }
-
-            List<Double> chunkEmbedding = embeddingService.deserializeEmbedding(chunk.getEmbedding());
-            if (chunkEmbedding.isEmpty()) {
-                continue;
-            }
-
-            double similarity = cosineSimilarity(questionEmbedding, chunkEmbedding);
-            similarityScores.put(chunk, similarity);
-        }
-
-        if (similarityScores.isEmpty()) {
+        if (topChunks.isEmpty()) {
             return Map.of("error", "No usable embeddings found for this document.");
         }
-
-        List<DocumentChunk> topChunks = similarityScores.entrySet()
-                .stream()
-                .sorted(Map.Entry.<DocumentChunk, Double>comparingByValue().reversed())
-                .limit(3)
-                .map(Map.Entry::getKey)
-                .toList();
 
         StringBuilder context = new StringBuilder();
         for (DocumentChunk chunk : topChunks) {
@@ -214,7 +189,7 @@ public class DocumentService {
         Map<String, Object> response = new HashMap<>();
         response.put("documentId", documentId);
         response.put("question", question);
-        response.put("embeddingProvider", normalizeEmbeddingProvider(embeddingProvider));
+        response.put("embeddingProvider", normalizedEmbeddingProvider);
         response.put("answerProvider", normalizedAnswerProvider);
         response.put("retrievedChunkIds", chunkIds);
         response.put("retrievedLineRanges", chunkLineRanges);
@@ -226,6 +201,59 @@ public class DocumentService {
 
     public Map<String, Object> askQuestion(Long documentId, String question) {
         return askQuestion(documentId, question, null, null);
+    }
+
+    private List<DocumentChunk> findTopChunks(Long documentId, String embeddingProvider, List<Double> questionEmbedding) {
+        if (embeddingService.supportsPgVector(embeddingProvider)) {
+            try {
+                List<DocumentChunk> vectorMatches = chunkRepository.findTopSimilarChunks(
+                        documentId,
+                        embeddingService.toPgVectorLiteral(questionEmbedding),
+                        TOP_K
+                );
+                if (!vectorMatches.isEmpty()) {
+                    logger.debug("Using pgvector retrieval for documentId={}, topChunks={}", documentId, vectorMatches.size());
+                    return vectorMatches;
+                }
+            } catch (Exception ex) {
+                logger.warn("pgvector retrieval unavailable for documentId={}. Falling back to in-memory similarity.", documentId, ex);
+            }
+        }
+
+        return findTopChunksInMemory(documentId, questionEmbedding);
+    }
+
+    private List<DocumentChunk> findTopChunksInMemory(Long documentId, List<Double> questionEmbedding) {
+        List<DocumentChunk> chunks = chunkRepository.findByDocumentId(documentId);
+        if (chunks.isEmpty()) {
+            return List.of();
+        }
+
+        Map<DocumentChunk, Double> similarityScores = new HashMap<>();
+        for (DocumentChunk chunk : chunks) {
+            if (chunk.getEmbedding() == null) {
+                continue;
+            }
+
+            List<Double> chunkEmbedding = embeddingService.deserializeEmbedding(chunk.getEmbedding());
+            if (chunkEmbedding.isEmpty()) {
+                continue;
+            }
+
+            double similarity = cosineSimilarity(questionEmbedding, chunkEmbedding);
+            similarityScores.put(chunk, similarity);
+        }
+
+        if (similarityScores.isEmpty()) {
+            return List.of();
+        }
+
+        return similarityScores.entrySet()
+                .stream()
+                .sorted(Map.Entry.<DocumentChunk, Double>comparingByValue().reversed())
+                .limit(TOP_K)
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     private double cosineSimilarity(List<Double> v1, List<Double> v2) {
@@ -290,10 +318,7 @@ public class DocumentService {
     }
 
     private String normalizeEmbeddingProvider(String provider) {
-        if (provider == null || provider.isBlank()) {
-            return "openai";
-        }
-        return provider.trim().toLowerCase();
+        return embeddingService.resolveProvider(provider);
     }
 
     private String normalizeAnswerProvider(String provider) {

@@ -6,6 +6,7 @@ import UploadPage from "./pages/UploadPage";
 import ErrorPage from "./pages/ErrorPage";
 import AboutArchitecturePage from "./pages/AboutArchitecturePage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
+import PolicyStudioPage from "./pages/PolicyStudioPage";
 import FloatingMusicPlayer from "./components/FloatingMusicPlayer";
 import { useLocation } from "react-router-dom";
 
@@ -31,6 +32,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <UploadPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/policy-studio"
+          element={
+            <ProtectedRoute>
+              <PolicyStudioPage />
             </ProtectedRoute>
           }
         />

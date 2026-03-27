@@ -1,4 +1,3 @@
-
 env_file:
   - .env
 spring:
@@ -6,11 +5,15 @@ spring:
     url: jdbc:postgresql://localhost:5432/${POSTGRES_DB}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
+  sql:
+    init:
+      mode: always
   servlet:
     multipart:
       max-file-size: ${APP_MAX_FILE_SIZE:50MB}
       max-request-size: ${APP_MAX_REQUEST_SIZE:50MB}
   jpa:
+    defer-datasource-initialization: true
     hibernate:
       ddl-auto: update
     show-sql: true
@@ -42,7 +45,6 @@ spring:
             client-id: ${GOOGLE_CLIENT_ID:disabled-google-client-id}
             client-secret: ${GOOGLE_CLIENT_SECRET:disabled-google-client-secret}
             authorization-grant-type: authorization_code
-            # Use an explicit backend base URL so local Docker and deployed hosts generate stable OAuth callbacks.
             redirect-uri: "${APP_OAUTH2_BASE_URL:http://localhost:8080}/login/oauth2/code/{registrationId}"
             scope: openid, profile, email
           microsoft:
@@ -83,7 +85,7 @@ logging:
     name: logs/policymind-document-service.log
 
 openai:
- api-key: ${OPENAI_API_KEY}
+  api-key: ${OPENAI_API_KEY}
 
 ai:
   provider:
@@ -109,7 +111,47 @@ app:
   header-content:
     csv-path: ${HEADER_CONTENT_CSV_PATH:resource_docs/contracts_policies_jokes.csv}
     redis-key: ${HEADER_CONTENT_REDIS_KEY:policymind:header-content}
- 
+  network:
+    defaults:
+      connect-timeout: 2s
+      read-timeout: 10s
+      call-timeout: 12s
+      retry-max-attempts: 3
+      retry-wait-duration: 300ms
+      circuit-breaker-failure-rate-threshold: 50
+      circuit-breaker-sliding-window-size: 10
+      circuit-breaker-minimum-number-of-calls: 5
+      circuit-breaker-wait-duration-in-open-state: 30s
+      circuit-breaker-permitted-calls-in-half-open-state: 3
+      max-concurrent-calls: 8
+      max-wait-duration: 250ms
+    services:
+      openai-chat:
+        read-timeout: 20s
+        call-timeout: 25s
+        max-concurrent-calls: 6
+      openai-embedding:
+        read-timeout: 20s
+        call-timeout: 25s
+        max-concurrent-calls: 12
+      vertex-chat:
+        read-timeout: 20s
+        call-timeout: 25s
+        max-concurrent-calls: 6
+      vertex-embedding:
+        read-timeout: 20s
+        call-timeout: 25s
+        max-concurrent-calls: 12
+      recaptcha:
+        connect-timeout: 1s
+        read-timeout: 3s
+        call-timeout: 4s
+        retry-max-attempts: 2
+        retry-wait-duration: 200ms
+        circuit-breaker-sliding-window-size: 8
+        circuit-breaker-minimum-number-of-calls: 4
+        max-concurrent-calls: 20
+        max-wait-duration: 100ms
+
 jwt:
- #secret: policymind-production-super-secure-2026-jwt-key
- secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET}

@@ -99,7 +99,10 @@ try {
 
     $mavenStderr = ""
     if (Test-Path $mavenStderrPath) {
-        $mavenStderr = (Get-Content $mavenStderrPath -Raw).Trim()
+        $mavenStderrRaw = Get-Content $mavenStderrPath -Raw
+        if ($null -ne $mavenStderrRaw) {
+            $mavenStderr = $mavenStderrRaw.Trim()
+        }
     }
 
     if ($mavenExitCode -ne 0) {
@@ -126,3 +129,4 @@ elseif (-not $SkipFrontend -and (Test-Path (Join-Path $repoRoot "frontend\packag
     Write-Host "Use -FrontendBuild to run a local production build as a preflight check." -ForegroundColor Yellow
     Write-Host "Backend Maven tests completed successfully." -ForegroundColor Green
 }
+

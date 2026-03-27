@@ -93,7 +93,8 @@ public class DocumentProcessingPipeline {
                 chunk.setEmbedding(embeddingService.serializeEmbedding(embeddingVector));
                 chunk.setStartLine(lineRange.startLine());
                 chunk.setEndLine(lineRange.endLine());
-                chunkRepository.save(chunk);
+                chunk = chunkRepository.save(chunk);
+                persistPgVector(chunk.getId(), embeddingVector);
                 chunkCount++;
             }
             logger.info("Embedding and persistence completed for documentId={}, chunksStored={}", savedDoc.getId(), chunkCount);
@@ -138,6 +139,14 @@ public class DocumentProcessingPipeline {
                     "Failed to process document at stage '" + stage + "': " + rootCauseMessage(e),
                     e
             );
+        }
+    }
+
+    private void persistPgVector(Long chunkId, List<Double> embeddingVector) {
+        try {
+            chunkRepository.updateEmbeddingVector(chunkId, embeddingService.toPgVectorLiteral(embeddingVector));
+        } catch (Exception ex) {
+            logger.warn("Chunk {} saved without pgvector column update. Falling back to JSON embeddings for retrieval.", chunkId, ex);
         }
     }
 

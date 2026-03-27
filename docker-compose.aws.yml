@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: policymind_postgres
     env_file:
       - .env.production
@@ -75,3 +75,4 @@ services:
 
 volumes:
   postgres_data:
+

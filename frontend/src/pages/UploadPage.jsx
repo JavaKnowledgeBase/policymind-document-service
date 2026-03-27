@@ -383,10 +383,7 @@ export default function UploadPage() {
               Bring in a document, follow its processing status, and ask focused questions once the review is ready.
             </p>
           </div>
-          <div className="workspace-summary">
-            <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>
-            <p>{canAskQuestion ? "Your document is ready for questions." : "Upload a file to begin the review flow."}</p>
-          </div>
+          <div className="workspace-summary">\n            <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>\n            <p>{canAskQuestion ? "Your document is ready for questions." : "Upload a file to begin the review flow."}</p>\n            <div className="workspace-summary-actions">\n              <Link className="summary-link" to="/policy-studio">Open Policy Studio</Link>\n            </div>\n          </div>
         </div>
 
         <div className="workspace-grid">
@@ -693,3 +690,4 @@ export default function UploadPage() {
     </main>
   );
 }
+

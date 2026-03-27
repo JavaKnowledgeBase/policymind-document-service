@@ -1,21 +1,31 @@
-
 package com.policymind.document.controller;
 
+import com.policymind.document.dto.AnalysisJobRequest;
 import com.policymind.document.exception.DocumentProcessingException;
+import com.policymind.document.service.AnalysisJobService;
+import com.policymind.document.service.DocumentService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import com.policymind.document.service.DocumentService;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @RestController
+@RequestMapping
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
@@ -26,18 +36,20 @@ public class DocumentController {
             .noStore();
 
     private final DocumentService documentService;
+    private final AnalysisJobService analysisJobService;
 
-    public DocumentController(DocumentService documentService) {
-		this.documentService = documentService;
-	}
+    public DocumentController(DocumentService documentService,
+                              AnalysisJobService analysisJobService) {
+        this.documentService = documentService;
+        this.analysisJobService = analysisJobService;
+    }
 
-	// Upload returns immediately and lets the worker finish parsing/chunking/embedding in the background.
-	@PostMapping("/upload")
+    @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
                                                       @RequestHeader(value = "X-Upload-Request-Id", required = false) String uploadRequestId,
                                                       HttpServletRequest request) {
         logger.info(
-                "Upload request received, uploadRequestId='{}', path='{}', remoteAddr='{}', fileName='{}', contentType='{}', sizeBytes={}",
+                "Upload request received, uploadRequestId='{}', path='{}', remoteAddr='{}', fileName='{}', contentType='{}', sizeBytes= {}",
                 uploadRequestId,
                 request == null ? null : request.getRequestURI(),
                 request == null ? null : request.getRemoteAddr(),
@@ -48,16 +60,15 @@ public class DocumentController {
         return noStore(HttpStatus.ACCEPTED, documentService.submitDocument(file));
     }
 
-    // This gives the UI a polling-friendly status endpoint ahead of a full worker/service split.
     @GetMapping("/documents/{id}")
     public ResponseEntity<Map<String, Object>> getDocumentStatus(@PathVariable Long id) {
         return noStore(HttpStatus.OK, documentService.getDocumentStatus(id));
     }
-	
-	@PostMapping("/{id}/ask")
-	public ResponseEntity<Map<String, Object>> askQuestion(
-	        @PathVariable Long id,
-	        @RequestBody(required = false) Map<String, Object> payload,
+
+    @PostMapping("/{id}/ask")
+    public ResponseEntity<Map<String, Object>> askQuestion(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> payload,
             @RequestHeader(value = "X-Question-Request-Id", required = false) String questionRequestId,
             @RequestParam(required = false) String question,
             @RequestParam(required = false) String embeddingProvider,
@@ -90,8 +101,31 @@ public class DocumentController {
             finalAnswerProvider = payload.get("answerProvider").toString();
         }
 
-	    return noStore(HttpStatus.OK, documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
-	}
+        return noStore(HttpStatus.OK, documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
+    }
+
+    @PostMapping("/documents/{id}/analysis-jobs")
+    public ResponseEntity<Map<String, Object>> createAnalysisJob(@PathVariable Long id,
+                                                                 @RequestBody(required = false) AnalysisJobRequest request,
+                                                                 @RequestHeader(value = "X-Analysis-Request-Id", required = false) String analysisRequestId) {
+        logger.info("Analysis job request received, analysisRequestId='{}', documentId={}", analysisRequestId, id);
+        return noStore(HttpStatus.ACCEPTED, analysisJobService.createQuestionAnswerJob(id, request == null ? new AnalysisJobRequest() : request));
+    }
+
+    @GetMapping("/analysis-jobs/{jobId}")
+    public ResponseEntity<Map<String, Object>> getAnalysisJobStatus(@PathVariable Long jobId) {
+        return noStore(HttpStatus.OK, analysisJobService.getJobStatus(jobId));
+    }
+
+    @GetMapping("/analysis-jobs/{jobId}/result")
+    public ResponseEntity<Map<String, Object>> getAnalysisJobResult(@PathVariable Long jobId) {
+        return noStore(HttpStatus.OK, analysisJobService.getJobResult(jobId));
+    }
+
+    @GetMapping("/analysis-jobs/{jobId}/trace")
+    public ResponseEntity<Map<String, Object>> getAnalysisJobTrace(@PathVariable Long jobId) {
+        return noStore(HttpStatus.OK, analysisJobService.getJobTrace(jobId));
+    }
 
     @ExceptionHandler(DocumentProcessingException.class)
     public ResponseEntity<Map<String, Object>> handleDocumentProcessingException(DocumentProcessingException ex) {
