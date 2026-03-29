@@ -200,7 +200,6 @@ public class DocumentService {
                 : "This policy needs revision before it should be considered a strong HR baseline.";
         summary.put("assessment", missingClauses.isEmpty() && riskyClauses.isEmpty() ? "Strong baseline" : "Needs revision");
         summary.put("overview", overallAssessment);
-        summary.put("overallAssessment", overallAssessment);
         summary.put("policyType", detectedPolicyType);
         summary.put("documentText", assembledDocumentText);
 
@@ -384,3 +383,4 @@ public class DocumentService {
         return value == null ? "" : value.toLowerCase();
     }
 }
+

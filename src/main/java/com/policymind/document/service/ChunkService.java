@@ -1,7 +1,6 @@
 package com.policymind.document.service;
 
 import com.policymind.document.entity.DocumentChunk;
-import com.policymind.document.model.Document;
 import com.policymind.document.repository.DocumentChunkRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,10 +26,6 @@ public class ChunkService {
 
     public ChunkService(DocumentChunkRepository chunkRepository) {
         this.chunkRepository = chunkRepository;
-    }
-
-    public List<String> chunkText(String text) {
-        return extractClauseChunks(text, null).stream().map(ClauseChunk::content).toList();
     }
 
     public List<ClauseChunk> extractClauseChunks(String text, String sourceName) {
@@ -93,29 +88,6 @@ public class ChunkService {
 
         logger.info("Structured clause extraction completed, source='{}', clauseCount={}", sourceName, chunks.size());
         return chunks;
-    }
-
-    public int getChunkSize() {
-        return CHUNK_SIZE;
-    }
-
-    public void saveChunks(Document savedDoc, List<String> chunks) {
-        for (String chunkText : chunks) {
-            DocumentChunk chunk = new DocumentChunk();
-            chunk.setDocument(savedDoc);
-            chunk.setContent(trimContent(chunkText));
-            chunk.setEmbedding(null);
-            chunk.setChunkKind("legacy_text_chunk");
-            chunk.setSectionTitle("General");
-            chunk.setClauseType("general");
-            chunk.setDomain("hr_internal_policy");
-            chunk.setPolicyType(inferPolicyType(chunkText));
-            chunk.setJurisdiction("United States");
-            chunk.setSourceName(savedDoc == null ? null : savedDoc.getFileName());
-            chunk.setRiskTags(joinTags(inferRiskTags(chunkText)));
-            chunk.setReferenceClause(Boolean.FALSE);
-            chunkRepository.save(chunk);
-        }
     }
 
     private void addClauseChunk(List<ClauseChunk> chunks, String rawContent, String sectionTitle, int startLine, int endLine, String sourceName) {
@@ -246,6 +218,3 @@ public class ChunkService {
                               String domain, String policyType, String jurisdiction, String sourceName, String riskTags, boolean referenceClause) {
     }
 }
-
-
-

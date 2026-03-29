@@ -26,3 +26,4 @@ frontend/.env.local
 .tmp_diag.txt
 policymind-ai-80ed72ade163.json
 secrets/
+frontend/dist/
