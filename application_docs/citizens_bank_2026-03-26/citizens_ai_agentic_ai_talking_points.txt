@@ -1,0 +1,35 @@
+﻿Citizens Interview Talking Points: AI Models and Agentic AI
+
+Natural Spoken Answer
+
+When I've used AI models, I've mostly approached them as part of a larger application workflow, not just as a chatbot or standalone model. In my recent work, especially with PolicyMind, I used AI together with document ingestion, chunking, embeddings, semantic retrieval, and response generation so the output was grounded in actual source material. For me, the important part was making it useful and reliable in a real system, so I focused a lot on secure APIs, traceability, async processing, caching, and overall production behavior.
+
+My understanding of agentic AI is similar. I see it as more than just prompting a model well. It's really about building a system around the model so it can take steps in a controlled way, use tools, work through a task, and still stay within guardrails. That means thinking about orchestration, approvals, memory, logging, observability, and safe failure handling.
+
+I'd say my hands-on experience today is strongest in RAG, orchestration, and AI-powered backend workflows. I wouldn't overclaim that I've built a huge autonomous agent platform end to end in an enterprise bank setting, but I do think I've worked on the core building blocks that translate directly into that kind of work. That's one of the reasons this role is exciting to me.
+
+Shorter Spoken Version
+
+I've used AI models mainly as part of real application workflows, especially around RAG, document intelligence, and orchestration. My focus has been on making them reliable, secure, and grounded, not just generating output. When I think about agentic AI, I think about the whole system around the model: tool use, multi-step execution, guardrails, observability, and safe behavior. My direct experience is strongest in AI workflow orchestration, and I see that as a strong foundation for building enterprise agentic systems.
+
+Likely Follow-Up Questions
+
+1. Can you give me one concrete example of how you used AI in an application?
+2. Which models or AI providers have you worked with?
+3. How did you decide when to use RAG versus fine-tuning or prompt engineering?
+4. How would you design an agent that can safely take actions in a regulated environment?
+5. What do you think are the biggest risks in agentic AI systems?
+6. How would you defend against prompt injection or unsafe tool execution?
+7. How would you evaluate whether an AI agent is actually performing well?
+8. What kind of observability would you put around an agent workflow?
+9. How would you handle memory for an AI agent?
+10. What's the difference between a chatbot, a RAG system, and an agentic AI system?
+11. Have you implemented tool calling or function calling directly?
+12. How would you build approval flows for high-risk actions?
+13. How would you make an AI workflow reliable when models can be non-deterministic?
+14. How do you think about latency and cost in production AI systems?
+15. What part of this role is closest to what you've already done, and what part would be newer for you?
+
+Interview-Safe Bridge Line
+
+That specific piece is an area where I understand the design well and I've worked on adjacent building blocks, even if I haven't implemented that exact version in production yet.

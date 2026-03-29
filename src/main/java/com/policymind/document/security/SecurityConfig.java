@@ -1,11 +1,12 @@
 package com.policymind.document.security;
 
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.beans.factory.annotation.Value;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
@@ -46,12 +47,12 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/health", "/auth/**", "/oauth2/**", "/login/**", "/content/**").permitAll()
+                .requestMatchers(EndpointRequest.to("health", "info")).permitAll()
                 .anyRequest().authenticated()
             )
             .oauth2Login(oauth -> oauth
@@ -62,34 +63,32 @@ public class SecurityConfig {
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, authException) -> {
                     logger.warn(
-                            "Unauthorized request blocked, method='{}', path='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
-                            request.getMethod(),
-                            request.getRequestURI(),
-                            request.getHeader("Authorization") != null,
-                            request.getHeader("X-Upload-Request-Id"),
-                            request.getHeader("X-Question-Request-Id"),
-                            authException.getMessage()
+                        "Unauthorized request blocked, method='{}', path='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
+                        request.getMethod(),
+                        request.getRequestURI(),
+                        request.getHeader("Authorization") != null,
+                        request.getHeader("X-Upload-Request-Id"),
+                        request.getHeader("X-Question-Request-Id"),
+                        authException.getMessage()
                     );
                     response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage());
                 })
                 .accessDeniedHandler((request, response, accessDeniedException) -> {
                     logger.warn(
-                            "Forbidden request blocked, method='{}', path='{}', principal='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
-                            request.getMethod(),
-                            request.getRequestURI(),
-                            request.getUserPrincipal() == null ? null : request.getUserPrincipal().getName(),
-                            request.getHeader("Authorization") != null,
-                            request.getHeader("X-Upload-Request-Id"),
-                            request.getHeader("X-Question-Request-Id"),
-                            accessDeniedException.getMessage()
+                        "Forbidden request blocked, method='{}', path='{}', principal='{}', authHeaderPresent={}, uploadRequestId='{}', questionRequestId='{}', message='{}'",
+                        request.getMethod(),
+                        request.getRequestURI(),
+                        request.getUserPrincipal() == null ? null : request.getUserPrincipal().getName(),
+                        request.getHeader("Authorization") != null,
+                        request.getHeader("X-Upload-Request-Id"),
+                        request.getHeader("X-Question-Request-Id"),
+                        accessDeniedException.getMessage()
                     );
                     response.sendError(HttpServletResponse.SC_FORBIDDEN, accessDeniedException.getMessage());
                 })
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
-            );
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));
 
         return http.build();
     }
@@ -124,3 +123,4 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 }
+

@@ -1,0 +1,30 @@
+Citizens Bank Interview Introduction
+
+Main Introduction
+
+Hi Krishna, thank you for the opportunity. I'm Ravi Kafley, a senior software engineer with over 14 years of experience building secure, enterprise-grade software across government, financial, healthcare, and commercial environments. Most of my background is in backend and full stack engineering, with a strong focus on Java, Spring Boot, APIs, system modernization, production support, and secure software delivery.
+
+More recently, I've been building AI-driven workflows through my PolicyMind platform, where I designed Spring Boot services and a multi-step document intelligence pipeline for file validation, parsing, chunking, embedding creation, semantic retrieval, and evidence-backed response generation. That gave me hands-on experience with orchestration, asynchronous processing, Redis caching, PostgreSQL-backed traceability, and building AI workflows that need to be reliable, secure, and practical in production.
+
+What really attracted me to this Citizens role is that it sits right at the intersection of my core strengths: enterprise software engineering, secure and regulated environments, and emerging agentic AI systems. While my recent AI work has been centered on RAG and orchestration rather than large-scale agent platforms at a bank, I think the foundation is very transferable. I'm comfortable building the backend services, workflow coordination, observability, and guardrails needed to make AI systems safe, auditable, and useful in production.
+
+Short Version
+
+I'm Ravi Kafley, a senior software engineer with 14+ years of experience building secure enterprise systems, mainly with Java, Spring Boot, APIs, and modernization work in regulated environments. Recently I've been focused on AI-driven document workflows, including RAG, asynchronous orchestration, vector retrieval, and evidence-backed responses through my PolicyMind platform. This Citizens role is exciting to me because it combines production engineering, secure enterprise delivery, and agentic AI, which aligns well with both my background and where I want to keep growing.
+
+Why Citizens / Why This Role
+
+What stands out to me is that Citizens is looking for someone who can do more than prototype AI. The role is about building secure, reliable, compliant AI agents that can actually operate in enterprise workflows. That's the part I connect with most, because my background has always been production-first: strong architecture, operational reliability, security controls, and making systems work in real environments, especially where governance matters.
+
+Key Points To Emphasize
+
+- 14+ years of enterprise software engineering experience
+- Strong Java, Spring Boot, API, and backend architecture background
+- Financial and government regulated-environment experience
+- Production support, incident response, performance tuning, and secure SDLC
+- Recent hands-on work with RAG, orchestration, async pipelines, Redis, and PostgreSQL
+- Interest in growing from AI workflow orchestration into broader agentic AI platforms
+
+One-Line Answer For Tell Me About Yourself
+
+I'm a senior software engineer with deep enterprise backend experience and recent hands-on work in AI orchestration and RAG, and I'm especially interested in applying that foundation to secure, production-grade agentic AI at Citizens.

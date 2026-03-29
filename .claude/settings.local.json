@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/rkafl/Documents/Projects/**)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/resume-intellegence/ -name *.txt -o -name *.md -o -name *.sh -o -name *.env*)",
+      "Bash(xargs grep:*)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/resume-intellegence/ 'c:/Users/rkafl/Documents/Projects/retail store/' c:/Users/rkafl/Documents/Projects/torilaure-roi/ -name *.txt -o -name *.md)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/ -maxdepth 3 -name *.txt)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/resume-intellegence/ -name *.txt -o -name *.md)",
+      "Bash(find 'c:/Users/rkafl/Documents/Projects/retail store/' -name *.txt -o -name *.md)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/personal_financial_advisor/ -name *.txt -o -name *.md -o -name *.env*)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/ -maxdepth 4 -name *.yml -o -name *.yaml)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/ -maxdepth 3 -name *.md)",
+      "Bash(find c:/Users/rkafl/Documents/Projects/healthProj/ravi-job-apply/ -name *.txt -o -name *.md -o -name *.sh -o -name *.yml)"
+    ]
+  }
+}

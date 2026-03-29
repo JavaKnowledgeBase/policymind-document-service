@@ -40,7 +40,9 @@ services:
       SERVER_TOMCAT_REMOTEIP_PROTOCOL_HEADER: x-forwarded-proto
       SERVER_TOMCAT_REMOTE_IP_HEADER: x-forwarded-for
       AI_PROVIDER_EMBEDDING: ${AI_EMBEDDING_PROVIDER:-openai}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       APP_OAUTH2_BASE_URL: ${APP_OAUTH2_BASE_URL:-https://policymindsolutions.com}
+      FRONTEND_OAUTH_CALLBACK_URL: ${FRONTEND_OAUTH_CALLBACK_URL:-https://policymindsolutions.com/auth/callback}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       GCP_LOCATION: ${GCP_LOCATION:-us-central1}
       GCP_VERTEX_EMBEDDING_MODEL: ${GCP_VERTEX_EMBEDDING_MODEL:-text-embedding-005}
@@ -49,7 +51,7 @@ services:
       GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/policymind-ai-80ed72ade163.json
       JWT_SECRET: ${JWT_SECRET}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://policymindsolutions.com}
     volumes:
       - ./secrets/policymind-ai-80ed72ade163.json:/app/secrets/policymind-ai-80ed72ade163.json:ro
     restart: unless-stopped
@@ -75,4 +77,5 @@ services:
 
 volumes:
   postgres_data:
+
 

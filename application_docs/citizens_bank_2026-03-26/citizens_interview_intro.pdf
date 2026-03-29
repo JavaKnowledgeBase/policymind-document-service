@@ -1,0 +1,101 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 3610 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 54 738 Tm (Citizens Bank Interview Introduction) Tj
+1 0 0 1 54 722 Tm () Tj
+1 0 0 1 54 706 Tm (Main Introduction) Tj
+1 0 0 1 54 690 Tm () Tj
+1 0 0 1 54 674 Tm (Hi Krishna, thank you for the opportunity. I'm Ravi Kafley, a senior software engineer) Tj
+1 0 0 1 54 658 Tm (with over 14 years of experience building secure, enterprise-grade software across) Tj
+1 0 0 1 54 642 Tm (government, financial, healthcare, and commercial environments. Most of my background is) Tj
+1 0 0 1 54 626 Tm (in backend and full stack engineering, with a strong focus on Java, Spring Boot, APIs,) Tj
+1 0 0 1 54 610 Tm (system modernization, production support, and secure software delivery.) Tj
+1 0 0 1 54 594 Tm () Tj
+1 0 0 1 54 578 Tm (More recently, I've been building AI-driven workflows through my PolicyMind platform,) Tj
+1 0 0 1 54 562 Tm (where I designed Spring Boot services and a multi-step document intelligence pipeline) Tj
+1 0 0 1 54 546 Tm (for file validation, parsing, chunking, embedding creation, semantic retrieval, and) Tj
+1 0 0 1 54 530 Tm (evidence-backed response generation. That gave me hands-on experience with) Tj
+1 0 0 1 54 514 Tm (orchestration, asynchronous processing, Redis caching, PostgreSQL-backed traceability,) Tj
+1 0 0 1 54 498 Tm (and building AI workflows that need to be reliable, secure, and practical in production.) Tj
+1 0 0 1 54 482 Tm () Tj
+1 0 0 1 54 466 Tm (What really attracted me to this Citizens role is that it sits right at the intersection) Tj
+1 0 0 1 54 450 Tm (of my core strengths: enterprise software engineering, secure and regulated) Tj
+1 0 0 1 54 434 Tm (environments, and emerging agentic AI systems. While my recent AI work has been centered) Tj
+1 0 0 1 54 418 Tm (on RAG and orchestration rather than large-scale agent platforms at a bank, I think the) Tj
+1 0 0 1 54 402 Tm (foundation is very transferable. I'm comfortable building the backend services, workflow) Tj
+1 0 0 1 54 386 Tm (coordination, observability, and guardrails needed to make AI systems safe, auditable,) Tj
+1 0 0 1 54 370 Tm (and useful in production.) Tj
+1 0 0 1 54 354 Tm () Tj
+1 0 0 1 54 338 Tm (Short Version) Tj
+1 0 0 1 54 322 Tm () Tj
+1 0 0 1 54 306 Tm (I'm Ravi Kafley, a senior software engineer with 14+ years of experience building secure) Tj
+1 0 0 1 54 290 Tm (enterprise systems, mainly with Java, Spring Boot, APIs, and modernization work in) Tj
+1 0 0 1 54 274 Tm (regulated environments. Recently I've been focused on AI-driven document workflows,) Tj
+1 0 0 1 54 258 Tm (including RAG, asynchronous orchestration, vector retrieval, and evidence-backed) Tj
+1 0 0 1 54 242 Tm (responses through my PolicyMind platform. This Citizens role is exciting to me because) Tj
+1 0 0 1 54 226 Tm (it combines production engineering, secure enterprise delivery, and agentic AI, which) Tj
+1 0 0 1 54 210 Tm (aligns well with both my background and where I want to keep growing.) Tj
+1 0 0 1 54 194 Tm () Tj
+1 0 0 1 54 178 Tm (Why Citizens / Why This Role) Tj
+1 0 0 1 54 162 Tm () Tj
+1 0 0 1 54 146 Tm (What stands out to me is that Citizens is looking for someone who can do more than) Tj
+1 0 0 1 54 130 Tm (prototype AI. The role is about building secure, reliable, compliant AI agents that can) Tj
+1 0 0 1 54 114 Tm (actually operate in enterprise workflows. That's the part I connect with most, because) Tj
+1 0 0 1 54 98 Tm (my background has always been production-first: strong architecture, operational) Tj
+1 0 0 1 54 82 Tm (reliability, security controls, and making systems work in real environments, especially) Tj
+1 0 0 1 54 66 Tm (where governance matters.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 6 0 R >>
+endobj
+6 0 obj
+<< /Length 1105 >>
+stream
+BT
+/F1 12 Tf
+1 0 0 1 54 738 Tm () Tj
+1 0 0 1 54 722 Tm (Key Points To Emphasize) Tj
+1 0 0 1 54 706 Tm () Tj
+1 0 0 1 54 690 Tm (- 14+ years of enterprise software engineering experience) Tj
+1 0 0 1 54 674 Tm (- Strong Java, Spring Boot, API, and backend architecture background) Tj
+1 0 0 1 54 658 Tm (- Financial and government regulated-environment experience) Tj
+1 0 0 1 54 642 Tm (- Production support, incident response, performance tuning, and secure SDLC) Tj
+1 0 0 1 54 626 Tm (- Recent hands-on work with RAG, orchestration, async pipelines, Redis, and PostgreSQL) Tj
+1 0 0 1 54 610 Tm (- Interest in growing from AI workflow orchestration into broader agentic AI platforms) Tj
+1 0 0 1 54 594 Tm () Tj
+1 0 0 1 54 578 Tm (One-Line Answer For Tell Me About Yourself) Tj
+1 0 0 1 54 562 Tm () Tj
+1 0 0 1 54 546 Tm (I'm a senior software engineer with deep enterprise backend experience and recent hands-) Tj
+1 0 0 1 54 530 Tm (on work in AI orchestration and RAG, and I'm especially interested in applying that) Tj
+1 0 0 1 54 514 Tm (foundation to secure, production-grade agentic AI at Citizens.) Tj
+ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000296 00000 n 
+0000003958 00000 n 
+0000004133 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+5290
+%%EOF

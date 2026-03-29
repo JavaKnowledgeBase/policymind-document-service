@@ -12,7 +12,10 @@ services:
     env_file:
       - .env.production
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       APP_OAUTH2_BASE_URL: ${APP_OAUTH2_BASE_URL:-https://policymindsolutions.com}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://policymindsolutions.com}
+      FRONTEND_OAUTH_CALLBACK_URL: ${FRONTEND_OAUTH_CALLBACK_URL:-https://policymindsolutions.com/auth/callback}
       GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/policymind-ai-80ed72ade163.json
     volumes:
       - ./secrets/policymind-ai-80ed72ade163.json:/app/secrets/policymind-ai-80ed72ade163.json:ro
