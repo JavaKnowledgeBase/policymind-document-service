@@ -18,6 +18,8 @@ public class PolicyDraftSaveRequest {
     private String rationale;
     private String confidence;
     private Integer qualityScore;
+    private Object mustIncludeClauses;
+    private Object prohibitedClauses;
     private Object keyChanges;
     private Object implementationChecklist;
     private Object riskFlags;
@@ -149,6 +151,22 @@ public class PolicyDraftSaveRequest {
 
     public void setQualityScore(Integer qualityScore) {
         this.qualityScore = qualityScore;
+    }
+
+    public Object getMustIncludeClauses() {
+        return mustIncludeClauses;
+    }
+
+    public void setMustIncludeClauses(Object mustIncludeClauses) {
+        this.mustIncludeClauses = mustIncludeClauses;
+    }
+
+    public Object getProhibitedClauses() {
+        return prohibitedClauses;
+    }
+
+    public void setProhibitedClauses(Object prohibitedClauses) {
+        this.prohibitedClauses = prohibitedClauses;
     }
 
     public Object getKeyChanges() {

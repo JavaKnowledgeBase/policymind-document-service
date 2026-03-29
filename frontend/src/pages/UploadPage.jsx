@@ -62,7 +62,7 @@ function toStatusTone(status) {
   if (status === "FAILED") {
     return "danger";
   }
-  if (status === "PROCESSING" || status === "QUEUED") {
+  if (status === "PROCESSING" || status === "QUEUED" || status === "UPLOADING") {
     return "warning";
   }
   return "neutral";
@@ -83,7 +83,7 @@ function normalizeProcessingErrorMessage(message) {
 
 function normalizeUploadErrorMessage(statusCode, message, fileName) {
   if (statusCode === 413) {
-    return `“${fileName || "This file"}” is larger than the current upload limit. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`;
+    return `\"${fileName || "This file"}\" is larger than the current upload limit. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`;
   }
 
   if (String(message || "").includes("Only PDF files are supported right now.")) {
@@ -93,6 +93,25 @@ function normalizeUploadErrorMessage(statusCode, message, fileName) {
   return message || "The upload did not finish successfully.";
 }
 
+function toDisplayList(items) {
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
+function toPolicyStudioLines(items, fallbackField) {
+  return toDisplayList(items)
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+      if (item && typeof item === "object") {
+        return item.text || item.recommendedText || item.suggestedText || item.content || item.reason || item.title || item.name || item.clauseType || item[fallbackField] || JSON.stringify(item);
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export default function UploadPage() {
   const supportedFileMessage = "Only PDF files are supported right now.";
   const [activeStep, setActiveStep] = useState(1);
@@ -100,9 +119,11 @@ export default function UploadPage() {
   const [documentId, setDocumentId] = useState("");
   const [question, setQuestion] = useState("");
   const [answerData, setAnswerData] = useState(null);
+  const [reviewData, setReviewData] = useState(null);
   const [documentStatus, setDocumentStatus] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const workspaceTopRef = useRef(null);
@@ -121,6 +142,12 @@ export default function UploadPage() {
   const canAskQuestion = Boolean(documentId && documentStatus?.status === "COMPLETED");
   const processingErrorMessage = normalizeProcessingErrorMessage(documentStatus?.errorMessage);
   const hasFailedDocument = documentStatus?.status === "FAILED";
+  const canRunReview = Boolean(documentId && documentStatus?.status === "COMPLETED");
+  const reviewSummary = reviewData?.summary || null;
+  const missingClauses = toDisplayList(reviewData?.missingClauses);
+  const riskyClauses = toDisplayList(reviewData?.riskyClauses);
+  const suggestedClauses = toDisplayList(reviewData?.suggestedClauses);
+  const referenceSources = toDisplayList(reviewData?.referenceSources);
 
   const rankedAnalysts = [
     openAiResponse && { source: "openai", response: openAiResponse },
@@ -171,11 +198,53 @@ export default function UploadPage() {
     }
   };
 
+  const buildPolicyStudioState = () => {
+    if (!reviewData) {
+      return null;
+    }
+
+    const goals = [
+      "Rewrite this HR/internal policy using the uploaded policy as the source draft.",
+      missingClauses.length ? `Address ${missingClauses.length} missing clauses identified during review.` : "",
+      riskyClauses.length ? `Reduce or replace ${riskyClauses.length} risky clauses identified during review.` : "",
+      suggestedClauses.length ? "Incorporate trusted replacement language where appropriate." : ""
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const additionalInstructions = [
+      reviewSummary?.assessment ? `Assessment: ${reviewSummary.assessment}` : "",
+      reviewSummary?.overview ? `Overview: ${reviewSummary.overview}` : "",
+      referenceSources.length ? `Reference sources: ${referenceSources.map((item) => item.sourceName || item.title || item).join(", ")}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    return {
+      policyType: reviewData?.policyType || reviewSummary?.policyType || "HR Internal Policy",
+      goals,
+      sourceText: reviewSummary?.documentText || "",
+      additionalInstructions,
+      mustIncludeClauses: toPolicyStudioLines([...missingClauses, ...suggestedClauses], "recommendedText"),
+      prohibitedClauses: toPolicyStudioLines(riskyClauses, "content"),
+      reviewContext: {
+        documentId,
+        fileName: documentStatus?.fileName || file?.name || "Uploaded policy",
+        missingClauses,
+        riskyClauses,
+        suggestedClauses,
+        referenceSources
+      }
+    };
+  };
+
   const chooseAnotherFile = () => {
     setMessage("");
     setError("");
     setDocumentStatus(null);
     setDocumentId("");
+    setAnswerData(null);
+    setReviewData(null);
     setActiveStep(1);
     resetSelectedFile();
     window.requestAnimationFrame(() => {
@@ -200,7 +269,7 @@ export default function UploadPage() {
     const pollStatus = async () => {
       try {
         await loadDocumentStatus(documentId);
-      } catch (err) {
+      } catch {
         // Keep the last known status visible and let the user retry manually if needed.
       }
     };
@@ -229,6 +298,7 @@ export default function UploadPage() {
     setMessage("");
     setError("");
     setAnswerData(null);
+    setReviewData(null);
     setDocumentStatus(null);
 
     if (!file) {
@@ -244,7 +314,7 @@ export default function UploadPage() {
 
     if ((file.size || 0) > MAX_UPLOAD_SIZE_BYTES) {
       resetSelectedFile();
-      setError(`“${file.name || "This file"}” is too large. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`);
+      setError(`\"${file.name || "This file"}\" is too large. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`);
       return;
     }
 
@@ -278,10 +348,10 @@ export default function UploadPage() {
       if (typeof data === "string") {
         setMessage(data);
       } else {
+        const nextDocumentId = data?.documentId ? String(data.documentId) : "";
         const fileName = data?.fileName || "document";
-        const documentId = data?.documentId ?? "N/A";
-        if (data?.documentId) {
-          setDocumentId(String(data.documentId));
+        if (nextDocumentId) {
+          setDocumentId(nextDocumentId);
         }
         setDocumentStatus({
           documentId: data?.documentId ?? null,
@@ -291,9 +361,7 @@ export default function UploadPage() {
           completedAt: null,
           errorMessage: null
         });
-        setMessage(
-          `${fileName} has been uploaded. Document ID: ${documentId}. We are processing it now in the background.`
-        );
+        setMessage(`${fileName} has been uploaded. Document ID: ${nextDocumentId || "N/A"}. We are processing it now in the background.`);
       }
     } catch (err) {
       if (requestId !== uploadRequestIdRef.current) {
@@ -325,6 +393,7 @@ export default function UploadPage() {
     event.preventDefault();
     setError("");
     setAnswerData(null);
+    setReviewData(null);
 
     if (!documentId) {
       setError("Enter a document ID before asking a question.");
@@ -357,7 +426,7 @@ export default function UploadPage() {
         return;
       }
       setAnswerData(response.data);
-    } catch (err) {
+    } catch {
       if (requestId !== askRequestIdRef.current) {
         return;
       }
@@ -367,6 +436,33 @@ export default function UploadPage() {
         setIsAsking(false);
       }
     }
+  };
+
+  const handleReview = async () => {
+    setError("");
+    setMessage("");
+    setReviewData(null);
+
+    if (!canRunReview) {
+      setError("The document review will be ready once processing is completed.");
+      return;
+    }
+
+    try {
+      setIsReviewing(true);
+      const response = await client.get(`/documents/${documentId}/review`);
+      setReviewData(response.data);
+      setMessage("Policy review is ready. You can inspect missing clauses, risky language, and send the findings to Policy Studio.");
+    } catch (err) {
+      setError(err.response?.data?.error || "We could not run the policy review right now. Please try again in a moment.");
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
+  const openPolicyStudioFromReview = () => {
+    const studioState = buildPolicyStudioState();
+    navigate("/policy-studio", { state: studioState || undefined });
   };
 
   return (
@@ -380,10 +476,16 @@ export default function UploadPage() {
             <p className="eyebrow">Review Workspace</p>
             <h1>Upload, track, and review with confidence</h1>
             <p className="muted workspace-lead">
-              Bring in a document, follow its processing status, and ask focused questions once the review is ready.
+              Bring in a document, follow its processing status, run a clause review, and push trusted findings into drafting.
             </p>
           </div>
-          <div className="workspace-summary">\n            <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>\n            <p>{canAskQuestion ? "Your document is ready for questions." : "Upload a file to begin the review flow."}</p>\n            <div className="workspace-summary-actions">\n              <Link className="summary-link" to="/policy-studio">Open Policy Studio</Link>\n            </div>\n          </div>
+          <div className="workspace-summary">
+            <span className={`status-pill status-${statusTone}`}>{statusLabel}</span>
+            <p>{canRunReview ? "Your document is ready for review and questions." : "Upload a file to begin the review flow."}</p>
+            <div className="workspace-summary-actions">
+              <Link className="summary-link" to="/policy-studio">Open Policy Studio</Link>
+            </div>
+          </div>
         </div>
 
         <div className="workspace-grid">
@@ -411,6 +513,8 @@ export default function UploadPage() {
                     setError("");
                     setMessage("");
                     setDocumentStatus(null);
+                    setReviewData(null);
+                    setAnswerData(null);
                     setFile(e.target.files?.[0] || null);
                   }}
                 />
@@ -528,6 +632,9 @@ export default function UploadPage() {
               <button type="button" className="secondary" onClick={() => loadDocumentStatus(documentId)} disabled={!documentId}>
                 Refresh Status
               </button>
+              <button type="button" onClick={handleReview} disabled={!canRunReview || isReviewing}>
+                {isReviewing ? "Reviewing Policy..." : "Run Policy Review"}
+              </button>
               {processingErrorMessage && (
                 <p className="error"><strong>Processing Error:</strong> {processingErrorMessage}</p>
               )}
@@ -541,9 +648,9 @@ export default function UploadPage() {
                 </div>
               </div>
               <ul className="feature-list compact-list">
-                <li>Use a clean policy, contract, or guideline document.</li>
-                <li>Wait for the status to show completed before asking questions.</li>
-                <li>Ask direct questions like coverage limits, deadlines, or compliance risks.</li>
+                <li>Use a clean HR or internal policy document for the best review output.</li>
+                <li>Wait for the status to show completed before asking questions or running review.</li>
+                <li>Send review findings to Policy Studio when you want a cleaner rewrite path.</li>
               </ul>
             </div>
           </aside>
@@ -568,13 +675,90 @@ export default function UploadPage() {
           </section>
         )}
 
+        {!!reviewData && (
+          <section className="rag-result">
+            <div className="rag-head">
+              <div>
+                <p className="eyebrow">Policy Review</p>
+                <h2>Clause findings</h2>
+              </div>
+              <div className="rag-badges">
+                <span className="badge">Assessment: {reviewSummary?.assessment || "Ready"}</span>
+                <span className="badge">Missing: {missingClauses.length}</span>
+                <span className="badge">Risky: {riskyClauses.length}</span>
+              </div>
+            </div>
+            {reviewSummary?.overview && (
+              <div className="rag-section">
+                <h3>Review summary</h3>
+                <p>{reviewSummary.overview}</p>
+              </div>
+            )}
+            <div className="rag-grid">
+              <div className="rag-section insight-card">
+                <h3>Missing clauses</h3>
+                {missingClauses.length ? (
+                  <ul>
+                    {missingClauses.map((item, idx) => (
+                      <li key={`missing-${idx}`}>{typeof item === "string" ? item : item.recommendedText || item.text || item.title || item.clauseType || "Missing clause"}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No missing clauses were identified in this review.</p>
+                )}
+              </div>
+              <div className="rag-section insight-card">
+                <h3>Risky language</h3>
+                {riskyClauses.length ? (
+                  <ul>
+                    {riskyClauses.map((item, idx) => (
+                      <li key={`risky-${idx}`}>{typeof item === "string" ? item : item.content || item.reason || item.text || item.title || item.clauseType || "Risky clause"}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No high-risk clauses were identified in this review.</p>
+                )}
+              </div>
+            </div>
+            <div className="rag-grid">
+              <div className="rag-section insight-card">
+                <h3>Suggested replacement language</h3>
+                {suggestedClauses.length ? (
+                  <ul>
+                    {suggestedClauses.map((item, idx) => (
+                      <li key={`suggested-${idx}`}>{typeof item === "string" ? item : item.recommendedText || item.suggestedText || item.text || item.title || item.clauseType || "Suggested clause"}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No replacement language was suggested for this review.</p>
+                )}
+              </div>
+              <div className="rag-section insight-card">
+                <h3>Reference sources</h3>
+                {referenceSources.length ? (
+                  <ul>
+                    {referenceSources.map((item, idx) => (
+                      <li key={`source-${idx}`}>{typeof item === "string" ? item : item.sourceName || item.title || item.text || "Trusted policy source"}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No reference sources were returned for this review.</p>
+                )}
+              </div>
+            </div>
+            <div className="actions upload-actions">
+              <button type="button" onClick={openPolicyStudioFromReview}>Send Findings To Policy Studio</button>
+            </div>
+          </section>
+        )}
+
         {message && <p className="success">{message}</p>}
         {error && <p className="error">{error}</p>}
         {(!!rankedAnalysts.length || !!answerData) && (
           <section className="rag-result">
             <div className="rag-head">
               <div>
-                <p className="eyebrow">Review Results</p>
+                <p className="eyebrow">Question Results</p>
                 <h2>PolicyMind Analysis</h2>
               </div>
               {leadAnalyst && (
@@ -587,7 +771,7 @@ export default function UploadPage() {
 
             {!rankedAnalysts.length && (
               <div className="rag-section">
-                <h3>No review available yet</h3>
+                <h3>No answer available yet</h3>
                 <p>We could not generate a clear answer yet. Try a more specific question or make sure the document has finished processing.</p>
               </div>
             )}
@@ -601,9 +785,7 @@ export default function UploadPage() {
                   </div>
                   <div className="rag-badges">
                     <span className="badge">Risk Score: {analyst.response?.risk_score ?? "N/A"}</span>
-                    <span className="badge">
-                      Confidence: {normalizeConfidence(analyst.response?.confidence)}
-                    </span>
+                    <span className="badge">Confidence: {normalizeConfidence(analyst.response?.confidence)}</span>
                   </div>
                 </div>
                 <div className="analysis-hero-card">
@@ -667,15 +849,15 @@ export default function UploadPage() {
         <div className="metrics-row upload-bottom-metrics">
           <div className="metric-card">
             <strong>Pipeline</strong>
-            <span>Upload, process, search, and answer in one guided flow.</span>
+            <span>Upload, review, and draft from one connected workflow.</span>
           </div>
           <div className="metric-card">
             <strong>Architecture</strong>
-            <span>Fast, reliable document review powered by secure services.</span>
+            <span>Clause-aware policy review backed by trusted reference content.</span>
           </div>
           <div className="metric-card">
             <strong>Audience</strong>
-            <span>Insurance agencies, legal teams, and contract reviewers</span>
+            <span>HR leaders, operations teams, and internal policy owners</span>
           </div>
         </div>
 
@@ -690,4 +872,3 @@ export default function UploadPage() {
     </main>
   );
 }
-

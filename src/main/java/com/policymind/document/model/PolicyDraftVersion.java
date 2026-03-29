@@ -41,6 +41,12 @@ public class PolicyDraftVersion {
     private String workingDraft;
 
     @Column(columnDefinition = "TEXT")
+    private String mustIncludeClausesJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String prohibitedClausesJson;
+
+    @Column(columnDefinition = "TEXT")
     private String keyChangesJson;
 
     @Column(columnDefinition = "TEXT")
@@ -130,6 +136,22 @@ public class PolicyDraftVersion {
 
     public void setWorkingDraft(String workingDraft) {
         this.workingDraft = workingDraft;
+    }
+
+    public String getMustIncludeClausesJson() {
+        return mustIncludeClausesJson;
+    }
+
+    public void setMustIncludeClausesJson(String mustIncludeClausesJson) {
+        this.mustIncludeClausesJson = mustIncludeClausesJson;
+    }
+
+    public String getProhibitedClausesJson() {
+        return prohibitedClausesJson;
+    }
+
+    public void setProhibitedClausesJson(String prohibitedClausesJson) {
+        this.prohibitedClausesJson = prohibitedClausesJson;
     }
 
     public String getKeyChangesJson() {

@@ -56,6 +56,23 @@ public class DocumentControllerTest {
     }
 
     @Test
+    public void documentReviewEndpoint_returnsOk() throws Exception {
+        DocumentService ds = Mockito.mock(DocumentService.class);
+        AnalysisJobService analysisJobService = Mockito.mock(AnalysisJobService.class);
+        when(ds.reviewDocument(42L)).thenReturn(java.util.Map.of("documentId", 42L, "policyType", "HR Policy", "missingClauses", java.util.List.of()));
+
+        DocumentController controller = new DocumentController(ds, analysisJobService);
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
+
+        mvc.perform(get("/documents/42/review"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Cache-Control", org.hamcrest.Matchers.containsString("no-store")))
+                .andExpect(header().string("Pragma", "no-cache"))
+                .andExpect(header().string("Expires", "0"))
+                .andExpect(jsonPath("$.policyType").value("HR Policy"));
+    }
+
+    @Test
     public void uploadEndpoint_returnsBadRequestWhenProcessingFails() throws Exception {
         DocumentService ds = Mockito.mock(DocumentService.class);
         AnalysisJobService analysisJobService = Mockito.mock(AnalysisJobService.class);

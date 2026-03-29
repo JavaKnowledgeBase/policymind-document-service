@@ -1180,6 +1180,66 @@ a:hover {
   margin-top: 14px;
 }
 
+.rewrite-source-shell {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(20, 108, 99, 0.14);
+  background: linear-gradient(160deg, rgba(248, 252, 251, 0.98) 0%, rgba(240, 247, 250, 0.98) 100%);
+}
+
+.rewrite-source-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rewrite-source-head h3,
+.rewrite-paste-panel p {
+  margin: 0;
+}
+
+.rewrite-source-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.source-method-chip {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--ink);
+  border: 1px solid rgba(121, 145, 163, 0.26);
+  box-shadow: none;
+}
+
+.source-method-chip:hover,
+.source-method-chip-active {
+  background: linear-gradient(135deg, var(--teal) 0%, #1c8a7f 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 12px 24px rgba(20, 108, 99, 0.22);
+}
+
+.rewrite-upload-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.rewrite-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.review-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+
 .risk-panel {
   margin-top: 16px;
 }
@@ -1193,8 +1253,15 @@ a:hover {
   }
 
   .mode-selector-grid,
-  .policy-grid-2 {
+  .policy-grid-2,
+  .review-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .rewrite-source-head,
+  .rewrite-upload-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 

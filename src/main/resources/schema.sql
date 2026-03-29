@@ -3,6 +3,39 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ALTER TABLE document_chunk
     ADD COLUMN IF NOT EXISTS embedding_vector vector(1536);
 
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS chunk_kind VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS section_title VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS clause_type VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS domain VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS policy_type VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS source_name VARCHAR(255);
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS risk_tags TEXT;
+
+ALTER TABLE document_chunk
+    ADD COLUMN IF NOT EXISTS reference_clause BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE policy_draft_version
+    ADD COLUMN IF NOT EXISTS must_include_clauses_json TEXT;
+
+ALTER TABLE policy_draft_version
+    ADD COLUMN IF NOT EXISTS prohibited_clauses_json TEXT;
+
 UPDATE document_chunk
 SET embedding_vector = CAST(embedding AS vector)
 WHERE embedding_vector IS NULL
@@ -51,6 +84,8 @@ CREATE TABLE IF NOT EXISTS policy_draft_version (
     rationale TEXT,
     source_text TEXT,
     working_draft TEXT,
+    must_include_clauses_json TEXT,
+    prohibited_clauses_json TEXT,
     key_changes_json TEXT,
     implementation_checklist_json TEXT,
     risk_flags_json TEXT,

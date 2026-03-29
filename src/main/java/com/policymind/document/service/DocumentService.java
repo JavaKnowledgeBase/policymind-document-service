@@ -16,8 +16,11 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,6 +37,7 @@ public class DocumentService {
     private final VertexAiService vertexAiService;
     private final DocumentProcessingWorker documentProcessingWorker;
     private final DocumentProcessingPipeline documentProcessingPipeline;
+    private final TrustedPolicyReferenceService trustedPolicyReferenceService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentService(DocumentRepository repository,
@@ -42,7 +46,8 @@ public class DocumentService {
                            OpenAiService openAiService,
                            VertexAiService vertexAiService,
                            DocumentProcessingWorker documentProcessingWorker,
-                           DocumentProcessingPipeline documentProcessingPipeline) {
+                           DocumentProcessingPipeline documentProcessingPipeline,
+                           TrustedPolicyReferenceService trustedPolicyReferenceService) {
         this.repository = repository;
         this.chunkRepository = chunkRepository;
         this.embeddingService = embeddingService;
@@ -50,15 +55,11 @@ public class DocumentService {
         this.vertexAiService = vertexAiService;
         this.documentProcessingWorker = documentProcessingWorker;
         this.documentProcessingPipeline = documentProcessingPipeline;
+        this.trustedPolicyReferenceService = trustedPolicyReferenceService;
     }
 
     public Map<String, Object> processDocument(MultipartFile file) {
-        logger.info(
-                "processDocument called, fileName='{}', contentType='{}', sizeBytes={}",
-                file == null ? null : file.getOriginalFilename(),
-                file == null ? null : file.getContentType(),
-                file == null ? null : file.getSize()
-        );
+        logger.info("processDocument called, fileName='{}', contentType='{}', sizeBytes={}", file == null ? null : file.getOriginalFilename(), file == null ? null : file.getContentType(), file == null ? null : file.getSize());
         if (file == null || file.isEmpty()) {
             logger.warn("processDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
@@ -67,22 +68,11 @@ public class DocumentService {
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "PROCESSING");
         byte[] fileBytes = readFileBytes(file, savedDoc.getId());
-        logger.info(
-                "Document accepted for immediate processing, documentId={}, file='{}', sizeBytes={}",
-                savedDoc.getId(),
-                savedDoc.getFileName(),
-                fileBytes.length
-        );
         return documentProcessingPipeline.processStoredDocument(savedDoc.getId(), savedDoc.getFileName(), fileBytes);
     }
 
     public Map<String, Object> submitDocument(MultipartFile file) {
-        logger.info(
-                "submitDocument called, fileName='{}', contentType='{}', sizeBytes={}",
-                file == null ? null : file.getOriginalFilename(),
-                file == null ? null : file.getContentType(),
-                file == null ? null : file.getSize()
-        );
+        logger.info("submitDocument called, fileName='{}', contentType='{}', sizeBytes={}", file == null ? null : file.getOriginalFilename(), file == null ? null : file.getContentType(), file == null ? null : file.getSize());
         if (file == null || file.isEmpty()) {
             logger.warn("submitDocument rejected empty upload");
             throw new DocumentProcessingException("Uploaded file is empty.");
@@ -91,12 +81,6 @@ public class DocumentService {
 
         Document savedDoc = createProcessingDocument(file.getOriginalFilename(), "QUEUED");
         byte[] fileBytes = readFileBytes(file, savedDoc.getId());
-        logger.info(
-                "Document accepted for async processing, documentId={}, file='{}', sizeBytes={}",
-                savedDoc.getId(),
-                savedDoc.getFileName(),
-                fileBytes.length
-        );
         documentProcessingWorker.processDocumentAsync(savedDoc.getId(), savedDoc.getFileName(), fileBytes);
 
         Map<String, Object> response = new HashMap<>();
@@ -109,10 +93,8 @@ public class DocumentService {
     }
 
     public Map<String, Object> getDocumentStatus(Long documentId) {
-        Document document = repository.findById(documentId)
-                .orElseThrow(() -> new DocumentProcessingException("Document not found: " + documentId));
+        Document document = repository.findById(documentId).orElseThrow(() -> new DocumentProcessingException("Document not found: " + documentId));
         long chunksStored = chunkRepository.countByDocumentId(documentId);
-        logger.debug("Document status requested, documentId={}, status={}, chunksStored={}", documentId, document.getStatus(), chunksStored);
 
         Map<String, Object> response = new HashMap<>();
         response.put("documentId", document.getId());
@@ -123,6 +105,116 @@ public class DocumentService {
         response.put("completedAt", document.getCompletedAt());
         response.put("errorMessage", document.getErrorMessage());
         response.put("chunksStored", chunksStored);
+        return response;
+    }
+
+    public Map<String, Object> reviewDocument(Long documentId) {
+        Document document = repository.findById(documentId).orElseThrow(() -> new DocumentProcessingException("Document not found: " + documentId));
+        List<DocumentChunk> documentChunks = chunkRepository.findByDocumentId(documentId);
+        if (documentChunks.isEmpty()) {
+            throw new DocumentProcessingException("No stored clauses were found for this document yet.");
+        }
+
+        List<DocumentChunk> policyClauses = documentChunks.stream()
+                .filter(chunk -> chunk.getClauseType() != null && !chunk.getClauseType().isBlank())
+                .toList();
+        if (policyClauses.isEmpty()) {
+            policyClauses = documentChunks;
+        }
+
+        List<TrustedPolicyReferenceService.ReferenceClause> references = trustedPolicyReferenceService.getHrInternalPolicyReferences();
+        Map<String, List<DocumentChunk>> chunksByClauseType = policyClauses.stream()
+                .filter(chunk -> chunk.getClauseType() != null && !chunk.getClauseType().isBlank())
+                .collect(Collectors.groupingBy(DocumentChunk::getClauseType));
+
+        List<Map<String, Object>> missingClauses = new ArrayList<>();
+        List<Map<String, Object>> suggestedClauses = new ArrayList<>();
+        for (TrustedPolicyReferenceService.ReferenceClause reference : references) {
+            if (!chunksByClauseType.containsKey(reference.clauseType())) {
+                Map<String, Object> missing = new LinkedHashMap<>();
+                missing.put("sectionTitle", reference.sectionTitle());
+                missing.put("clauseType", reference.clauseType());
+                missing.put("policyType", reference.policyType());
+                missing.put("recommendedText", reference.content());
+                missing.put("sourceName", reference.sourceName());
+                missing.put("riskTags", reference.riskTags());
+                missingClauses.add(missing);
+                suggestedClauses.add(missing);
+            }
+        }
+
+        List<Map<String, Object>> riskyClauses = new ArrayList<>();
+        for (DocumentChunk chunk : policyClauses) {
+            String normalizedText = normalize(chunk.getContent());
+            String normalizedRiskTags = normalize(chunk.getRiskTags());
+            boolean weakLanguage = !normalizedText.contains("must") && !normalizedText.contains("shall") && !normalizedText.contains("required");
+            boolean approvalAmbiguity = normalizedRiskTags.contains("approval_dependency") && weakLanguage;
+            boolean genericClause = "general".equalsIgnoreCase(String.valueOf(chunk.getClauseType())) && weakLanguage;
+            if (!approvalAmbiguity && !genericClause) {
+                continue;
+            }
+
+            String matchingClauseType = chunk.getClauseType() == null ? "general" : chunk.getClauseType();
+            TrustedPolicyReferenceService.ReferenceClause reference = references.stream()
+                    .filter(item -> item.clauseType().equalsIgnoreCase(matchingClauseType))
+                    .findFirst()
+                    .orElse(null);
+
+            Map<String, Object> risky = new LinkedHashMap<>();
+            risky.put("chunkId", chunk.getId());
+            risky.put("sectionTitle", chunk.getSectionTitle());
+            risky.put("clauseType", chunk.getClauseType());
+            risky.put("lineRange", toLineRangeLabel(chunk));
+            risky.put("content", trimPreview(chunk.getContent()));
+            risky.put("reason", approvalAmbiguity ? "This clause references approval or responsibility but uses weak language." : "This clause is too generic and may be missing enforceable wording.");
+            risky.put("suggestedText", reference == null ? null : reference.content());
+            risky.put("sourceName", reference == null ? null : reference.sourceName());
+            riskyClauses.add(risky);
+        }
+
+        String detectedPolicyType = policyClauses.stream()
+                .map(DocumentChunk::getPolicyType)
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .findFirst()
+                .orElse("HR Policy");
+        String assembledDocumentText = policyClauses.stream()
+                .map(DocumentChunk::getContent)
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.joining("\n\n"));
+
+        Set<String> clauseTypesFound = policyClauses.stream()
+                .map(DocumentChunk::getClauseType)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalClauses", policyClauses.size());
+        summary.put("requiredReferenceClauses", references.size());
+        summary.put("clauseTypesFound", clauseTypesFound.size());
+        summary.put("missingClauseCount", missingClauses.size());
+        summary.put("riskyClauseCount", riskyClauses.size());
+        String overallAssessment = missingClauses.isEmpty() && riskyClauses.isEmpty()
+                ? "Baseline HR policy coverage looks solid."
+                : "This policy needs revision before it should be considered a strong HR baseline.";
+        summary.put("assessment", missingClauses.isEmpty() && riskyClauses.isEmpty() ? "Strong baseline" : "Needs revision");
+        summary.put("overview", overallAssessment);
+        summary.put("overallAssessment", overallAssessment);
+        summary.put("policyType", detectedPolicyType);
+        summary.put("documentText", assembledDocumentText);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("documentId", document.getId());
+        response.put("fileName", document.getFileName());
+        response.put("status", document.getStatus());
+        response.put("domain", "hr_internal_policy");
+        response.put("policyType", detectedPolicyType);
+        response.put("summary", summary);
+        response.put("missingClauses", missingClauses);
+        response.put("riskyClauses", riskyClauses);
+        response.put("suggestedClauses", suggestedClauses);
+        response.put("referenceSources", references.stream().map(TrustedPolicyReferenceService.ReferenceClause::sourceName).distinct().toList());
         return response;
     }
 
@@ -137,17 +229,10 @@ public class DocumentService {
 
         StringBuilder context = new StringBuilder();
         for (DocumentChunk chunk : topChunks) {
-            context.append("[")
-                    .append(toLineRangeLabel(chunk))
-                    .append(" | Chunk ")
-                    .append(chunk.getId())
-                    .append("]\n")
-                    .append(chunk.getContent())
-                    .append("\n\n");
+            context.append("[").append(toLineRangeLabel(chunk)).append(" | Chunk ").append(chunk.getId()).append("]\n").append(chunk.getContent()).append("\n\n");
         }
 
         String normalizedAnswerProvider = normalizeAnswerProvider(answerProvider);
-
         Map<String, Object> providerResponses = new HashMap<>();
         Map<String, Object> openAiStructured = null;
         Map<String, Object> vertexStructured = null;
@@ -157,7 +242,6 @@ public class DocumentService {
             openAiStructured = parseStructuredAnswer(openAiResponseJson);
             providerResponses.put("openai", openAiStructured);
         }
-
         if ("vertex".equals(normalizedAnswerProvider) || "both".equals(normalizedAnswerProvider)) {
             String vertexResponseJson = vertexAiService.askLLM(context.toString(), question);
             vertexStructured = parseStructuredAnswer(vertexResponseJson);
@@ -166,25 +250,12 @@ public class DocumentService {
 
         Map<String, Object> structuredAnswer = openAiStructured != null ? openAiStructured : vertexStructured;
         if (structuredAnswer == null) {
-            structuredAnswer = Map.of(
-                    "summary", "No answer provider configured",
-                    "answer", "Set answer provider to openai, vertex, or both.",
-                    "confidence", "low",
-                    "risk_score", 5,
-                    "key_risks", List.of(),
-                    "recommended_actions", List.of()
-            );
+            structuredAnswer = Map.of("summary", "No answer provider configured", "answer", "Set answer provider to openai, vertex, or both.", "confidence", "low", "risk_score", 5, "key_risks", List.of(), "recommended_actions", List.of());
         }
 
-        List<Long> chunkIds = topChunks.stream()
-                .map(DocumentChunk::getId)
-                .collect(Collectors.toList());
-        List<String> chunkLineRanges = topChunks.stream()
-                .map(this::toLineRangeLabel)
-                .collect(Collectors.toList());
-        List<String> chunkPreviews = topChunks.stream()
-                .map(chunk -> trimPreview(chunk.getContent()))
-                .collect(Collectors.toList());
+        List<Long> chunkIds = topChunks.stream().map(DocumentChunk::getId).collect(Collectors.toList());
+        List<String> chunkLineRanges = topChunks.stream().map(this::toLineRangeLabel).collect(Collectors.toList());
+        List<String> chunkPreviews = topChunks.stream().map(chunk -> trimPreview(chunk.getContent())).collect(Collectors.toList());
 
         Map<String, Object> response = new HashMap<>();
         response.put("documentId", documentId);
@@ -206,84 +277,47 @@ public class DocumentService {
     private List<DocumentChunk> findTopChunks(Long documentId, String embeddingProvider, List<Double> questionEmbedding) {
         if (embeddingService.supportsPgVector(embeddingProvider)) {
             try {
-                List<DocumentChunk> vectorMatches = chunkRepository.findTopSimilarChunks(
-                        documentId,
-                        embeddingService.toPgVectorLiteral(questionEmbedding),
-                        TOP_K
-                );
+                List<DocumentChunk> vectorMatches = chunkRepository.findTopSimilarChunks(documentId, embeddingService.toPgVectorLiteral(questionEmbedding), TOP_K);
                 if (!vectorMatches.isEmpty()) {
-                    logger.debug("Using pgvector retrieval for documentId={}, topChunks={}", documentId, vectorMatches.size());
                     return vectorMatches;
                 }
             } catch (Exception ex) {
                 logger.warn("pgvector retrieval unavailable for documentId={}. Falling back to in-memory similarity.", documentId, ex);
             }
         }
-
         return findTopChunksInMemory(documentId, questionEmbedding);
     }
 
     private List<DocumentChunk> findTopChunksInMemory(Long documentId, List<Double> questionEmbedding) {
         List<DocumentChunk> chunks = chunkRepository.findByDocumentId(documentId);
-        if (chunks.isEmpty()) {
-            return List.of();
-        }
-
+        if (chunks.isEmpty()) return List.of();
         Map<DocumentChunk, Double> similarityScores = new HashMap<>();
         for (DocumentChunk chunk : chunks) {
-            if (chunk.getEmbedding() == null) {
-                continue;
-            }
-
+            if (chunk.getEmbedding() == null) continue;
             List<Double> chunkEmbedding = embeddingService.deserializeEmbedding(chunk.getEmbedding());
-            if (chunkEmbedding.isEmpty()) {
-                continue;
-            }
-
-            double similarity = cosineSimilarity(questionEmbedding, chunkEmbedding);
-            similarityScores.put(chunk, similarity);
+            if (chunkEmbedding.isEmpty()) continue;
+            similarityScores.put(chunk, cosineSimilarity(questionEmbedding, chunkEmbedding));
         }
-
-        if (similarityScores.isEmpty()) {
-            return List.of();
-        }
-
-        return similarityScores.entrySet()
-                .stream()
-                .sorted(Map.Entry.<DocumentChunk, Double>comparingByValue().reversed())
-                .limit(TOP_K)
-                .map(Map.Entry::getKey)
-                .toList();
+        if (similarityScores.isEmpty()) return List.of();
+        return similarityScores.entrySet().stream().sorted(Map.Entry.<DocumentChunk, Double>comparingByValue().reversed()).limit(TOP_K).map(Map.Entry::getKey).toList();
     }
 
     private double cosineSimilarity(List<Double> v1, List<Double> v2) {
         int size = Math.min(v1.size(), v2.size());
-        if (size == 0) {
-            return 0.0;
-        }
-
-        double dot = 0.0;
-        double normA = 0.0;
-        double normB = 0.0;
-
+        if (size == 0) return 0.0;
+        double dot = 0.0; double normA = 0.0; double normB = 0.0;
         for (int i = 0; i < size; i++) {
             dot += v1.get(i) * v2.get(i);
             normA += Math.pow(v1.get(i), 2);
             normB += Math.pow(v2.get(i), 2);
         }
-
         double denominator = Math.sqrt(normA) * Math.sqrt(normB);
-        if (denominator == 0.0) {
-            return 0.0;
-        }
-
-        return dot / denominator;
+        return denominator == 0.0 ? 0.0 : dot / denominator;
     }
 
     private Map<String, Object> parseStructuredAnswer(String llmResponseJson) {
         try {
-            return objectMapper.readValue(llmResponseJson, new TypeReference<>() {
-            });
+            return objectMapper.readValue(llmResponseJson, new TypeReference<>() {});
         } catch (Exception e) {
             Map<String, Object> fallback = new HashMap<>();
             fallback.put("summary", "Failed to parse structured output");
@@ -299,22 +333,15 @@ public class DocumentService {
 
     private String trimPreview(String text) {
         int limit = 250;
-        if (text == null) {
-            return "";
-        }
+        if (text == null) return "";
         return text.length() <= limit ? text : text.substring(0, limit) + "...";
     }
 
     private String toLineRangeLabel(DocumentChunk chunk) {
         Integer startLine = chunk.getStartLine();
         Integer endLine = chunk.getEndLine();
-        if (startLine == null || endLine == null) {
-            return "Line unavailable";
-        }
-        if (startLine.equals(endLine)) {
-            return "Line " + startLine;
-        }
-        return "Lines " + startLine + "-" + endLine;
+        if (startLine == null || endLine == null) return "Line unavailable";
+        return startLine.equals(endLine) ? "Line " + startLine : "Lines " + startLine + "-" + endLine;
     }
 
     private String normalizeEmbeddingProvider(String provider) {
@@ -322,13 +349,9 @@ public class DocumentService {
     }
 
     private String normalizeAnswerProvider(String provider) {
-        if (provider == null || provider.isBlank()) {
-            return "openai";
-        }
+        if (provider == null || provider.isBlank()) return "openai";
         String normalized = provider.trim().toLowerCase();
-        if ("openai".equals(normalized) || "vertex".equals(normalized) || "both".equals(normalized)) {
-            return normalized;
-        }
+        if ("openai".equals(normalized) || "vertex".equals(normalized) || "both".equals(normalized)) return normalized;
         return "openai";
     }
 
@@ -338,28 +361,13 @@ public class DocumentService {
         document.setStatus(status);
         document.setCreatedAt(LocalDateTime.now());
         document.setUpdatedAt(LocalDateTime.now());
-        Document savedDocument = repository.save(document);
-        logger.info("Document record created, documentId={}, file={}, status={}", savedDocument.getId(), savedDocument.getFileName(), savedDocument.getStatus());
-        return savedDocument;
+        return repository.save(document);
     }
 
     private byte[] readFileBytes(MultipartFile file, Long documentId) {
         try {
-            byte[] fileBytes = file.getBytes();
-            logger.info(
-                    "Uploaded file bytes read successfully, documentId={}, file='{}', sizeBytes={}",
-                    documentId,
-                    file.getOriginalFilename(),
-                    fileBytes.length
-            );
-            return fileBytes;
+            return file.getBytes();
         } catch (IOException e) {
-            logger.error(
-                    "Failed to read uploaded file bytes, documentId={}, file='{}'",
-                    documentId,
-                    file == null ? null : file.getOriginalFilename(),
-                    e
-            );
             throw new DocumentProcessingException("Failed to read uploaded file bytes.", e);
         }
     }
@@ -368,12 +376,11 @@ public class DocumentService {
         String fileName = file == null ? null : file.getOriginalFilename();
         String normalizedFileName = fileName == null ? "" : fileName.trim().toLowerCase();
         if (!normalizedFileName.endsWith(".pdf")) {
-            logger.warn(
-                    "Rejected unsupported upload, fileName='{}', contentType='{}'",
-                    fileName,
-                    file == null ? null : file.getContentType()
-            );
             throw new DocumentProcessingException(UNSUPPORTED_FILE_MESSAGE);
         }
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.toLowerCase();
     }
 }

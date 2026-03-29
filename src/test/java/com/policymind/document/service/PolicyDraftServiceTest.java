@@ -50,6 +50,8 @@ public class PolicyDraftServiceTest {
         request.setRationale("rationale");
         request.setQualityScore(88);
         request.setConfidence("high");
+        request.setMustIncludeClauses(List.of("Add approval workflow"));
+        request.setProhibitedClauses(List.of("Avoid vague discretion"));
         request.setKeyChanges(List.of("Clarified scope"));
         request.setImplementationChecklist(List.of("Legal review"));
         request.setRiskFlags(List.of("Pending approval"));
@@ -59,6 +61,8 @@ public class PolicyDraftServiceTest {
 
         assertEquals(10L, response.get("draftId"));
         assertEquals(1, response.get("currentVersionNumber"));
+        assertTrue(response.get("mustIncludeClauses") instanceof List);
+        assertTrue(response.get("prohibitedClauses") instanceof List);
         assertTrue(response.get("graphWorkflow") instanceof Map);
     }
 
@@ -91,6 +95,8 @@ public class PolicyDraftServiceTest {
         Map<String, Object> response = service.getDraft(10L);
 
         assertEquals(10L, response.get("draftId"));
+        assertTrue(response.get("mustIncludeClauses") instanceof List);
+        assertTrue(response.get("prohibitedClauses") instanceof List);
         assertTrue(response.get("keyChanges") instanceof List);
         assertTrue(response.get("composeResult") instanceof Map);
     }

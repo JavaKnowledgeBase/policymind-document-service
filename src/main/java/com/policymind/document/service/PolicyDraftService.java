@@ -77,6 +77,8 @@ public class PolicyDraftService {
         version.setRationale(draft.getLatestRationale());
         version.setSourceText(draft.getSourceText());
         version.setWorkingDraft(draft.getWorkingDraft());
+        version.setMustIncludeClausesJson(writeJson(normalizedRequest.getMustIncludeClauses()));
+        version.setProhibitedClausesJson(writeJson(normalizedRequest.getProhibitedClauses()));
         version.setKeyChangesJson(writeJson(normalizedRequest.getKeyChanges()));
         version.setImplementationChecklistJson(writeJson(normalizedRequest.getImplementationChecklist()));
         version.setRiskFlagsJson(writeJson(normalizedRequest.getRiskFlags()));
@@ -154,6 +156,8 @@ public class PolicyDraftService {
         response.put("createdAt", draft.getCreatedAt());
         response.put("updatedAt", draft.getUpdatedAt());
         response.put("lastGeneratedAt", draft.getLastGeneratedAt());
+        response.put("mustIncludeClauses", latestVersion == null ? List.of() : readJson(latestVersion.getMustIncludeClausesJson()));
+        response.put("prohibitedClauses", latestVersion == null ? List.of() : readJson(latestVersion.getProhibitedClausesJson()));
         response.put("keyChanges", latestVersion == null ? List.of() : readJson(latestVersion.getKeyChangesJson()));
         response.put("implementationChecklist", latestVersion == null ? List.of() : readJson(latestVersion.getImplementationChecklistJson()));
         response.put("riskFlags", latestVersion == null ? List.of() : readJson(latestVersion.getRiskFlagsJson()));
@@ -173,6 +177,8 @@ public class PolicyDraftService {
         response.put("rationale", version.getRationale());
         response.put("sourceText", version.getSourceText());
         response.put("workingDraft", version.getWorkingDraft());
+        response.put("mustIncludeClauses", readJson(version.getMustIncludeClausesJson()));
+        response.put("prohibitedClauses", readJson(version.getProhibitedClausesJson()));
         response.put("keyChanges", readJson(version.getKeyChangesJson()));
         response.put("implementationChecklist", readJson(version.getImplementationChecklistJson()));
         response.put("riskFlags", readJson(version.getRiskFlagsJson()));
@@ -204,7 +210,7 @@ public class PolicyDraftService {
 
     private String writeJson(Object value) {
         try {
-            return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+            return objectMapper.writeValueAsString(value == null ? List.of() : value);
         } catch (JsonProcessingException ex) {
             throw new DocumentProcessingException("Failed to serialize policy draft data.", ex);
         }
@@ -230,4 +236,3 @@ public class PolicyDraftService {
         return normalized.isBlank() ? fallback : normalized;
     }
 }
-

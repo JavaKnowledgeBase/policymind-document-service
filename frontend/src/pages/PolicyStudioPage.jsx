@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import client from "../api/client";
 import BrandBar from "../components/BrandBar";
 
@@ -16,6 +16,8 @@ const EMPTY_FORM = {
   mustIncludeClauses: "",
   prohibitedClauses: ""
 };
+const MAX_UPLOAD_SIZE_MB = 50;
+const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
 function splitLines(value) {
   return String(value || "")
@@ -32,6 +34,50 @@ function toGraphNodes(graphWorkflow) {
   return Array.isArray(graphWorkflow?.nodes) ? graphWorkflow.nodes : [];
 }
 
+function toDisplayList(items) {
+  return Array.isArray(items) ? items.filter(Boolean) : [];
+}
+
+function toPolicyStudioLines(items, fallbackField) {
+  return toDisplayList(items)
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+      if (item && typeof item === "object") {
+        return item.text || item.recommendedText || item.suggestedText || item.content || item.reason || item.title || item.name || item.clauseType || item[fallbackField] || JSON.stringify(item);
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function toStatusTone(status) {
+  if (status === "COMPLETED") {
+    return "success";
+  }
+  if (status === "FAILED") {
+    return "danger";
+  }
+  if (status === "PROCESSING" || status === "QUEUED" || status === "UPLOADING") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+function normalizeUploadErrorMessage(statusCode, message, fileName) {
+  if (statusCode === 413) {
+    return `"${fileName || "This file"}" is larger than the current upload limit. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`;
+  }
+
+  if (String(message || "").includes("Only PDF files are supported right now.")) {
+    return "Only PDF files are supported right now. Please choose a .pdf file.";
+  }
+
+  return message || "The upload did not finish successfully.";
+}
+
 export default function PolicyStudioPage() {
   const [mode, setMode] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
@@ -45,7 +91,18 @@ export default function PolicyStudioPage() {
   const [isLoadingDrafts, setIsLoadingDrafts] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [sourceMethod, setSourceMethod] = useState("paste");
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadedDocumentId, setUploadedDocumentId] = useState("");
+  const [uploadedDocumentStatus, setUploadedDocumentStatus] = useState(null);
+  const [reviewData, setReviewData] = useState(null);
+  const [isUploadingPolicy, setIsUploadingPolicy] = useState(false);
+  const [isReviewingPolicy, setIsReviewingPolicy] = useState(false);
+  const location = useLocation();
   const navigate = useNavigate();
+  const uploadRequestIdRef = useRef(0);
+  const statusRequestIdRef = useRef(0);
+  const fileInputRef = useRef(null);
 
   const isRewrite = mode === "rewrite";
   const graphNodes = toGraphNodes(composeResult?.graphWorkflow || savedDrafts.find((item) => item.draftId === currentDraftId)?.graphWorkflow);
@@ -56,6 +113,13 @@ export default function PolicyStudioPage() {
       words: text.trim() ? text.trim().split(/\s+/).length : 0
     };
   }, [workingDraft]);
+  const reviewSummary = reviewData?.summary || null;
+  const missingClauses = toDisplayList(reviewData?.missingClauses);
+  const riskyClauses = toDisplayList(reviewData?.riskyClauses);
+  const suggestedClauses = toDisplayList(reviewData?.suggestedClauses);
+  const canRunIntegratedReview = Boolean(uploadedDocumentId && uploadedDocumentStatus?.status === "COMPLETED");
+  const integratedStatusTone = toStatusTone(uploadedDocumentStatus?.status);
+  const importedReviewContext = reviewData?.reviewContext || null;
 
   const loadDrafts = async () => {
     try {
@@ -82,18 +146,111 @@ export default function PolicyStudioPage() {
     }
   };
 
+  const applyReviewToIntake = (payload, options = {}) => {
+    if (!payload) {
+      return;
+    }
+
+    const nextMissingClauses = toDisplayList(payload.missingClauses);
+    const nextRiskyClauses = toDisplayList(payload.riskyClauses);
+    const nextSuggestedClauses = toDisplayList(payload.suggestedClauses);
+    const nextReferenceSources = toDisplayList(payload.referenceSources);
+    const nextSummary = payload.summary || {};
+    const nextSourceText = nextSummary.documentText || "";
+    const nextGoals = [
+      "Rewrite this HR/internal policy using the uploaded policy as the source draft.",
+      nextMissingClauses.length ? `Address ${nextMissingClauses.length} missing clauses identified during review.` : "",
+      nextRiskyClauses.length ? `Reduce or replace ${nextRiskyClauses.length} risky clauses identified during review.` : "",
+      nextSuggestedClauses.length ? "Incorporate trusted replacement language where appropriate." : ""
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const nextInstructions = [
+      nextSummary.assessment ? `Assessment: ${nextSummary.assessment}` : "",
+      nextSummary.overview ? `Overview: ${nextSummary.overview}` : "",
+      nextReferenceSources.length ? `Reference sources: ${nextReferenceSources.map((item) => item.sourceName || item.title || item).join(", ")}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    setMode("rewrite");
+    setSourceMethod("upload");
+    setReviewData({
+      ...payload,
+      reviewContext: {
+        documentId: options.documentId || uploadedDocumentId || payload.documentId,
+        fileName: options.fileName || uploadedDocumentStatus?.fileName || uploadFile?.name || payload.fileName || "Uploaded policy",
+        missingClauses: nextMissingClauses,
+        riskyClauses: nextRiskyClauses,
+        suggestedClauses: nextSuggestedClauses,
+        referenceSources: nextReferenceSources
+      }
+    });
+    setForm((current) => ({
+      ...current,
+      policyType: payload.policyType || nextSummary.policyType || current.policyType,
+      goals: nextGoals || current.goals,
+      sourceText: nextSourceText || current.sourceText,
+      additionalInstructions: nextInstructions || current.additionalInstructions,
+      mustIncludeClauses: toPolicyStudioLines([...nextMissingClauses, ...nextSuggestedClauses], "recommendedText"),
+      prohibitedClauses: toPolicyStudioLines(nextRiskyClauses, "content")
+    }));
+    setWorkingDraft(nextSourceText || "");
+    setComposeResult(null);
+    setMessage("Review findings were loaded directly into Policy Studio. You can refine the intake, then rewrite the policy without switching workspaces.");
+    setError("");
+  };
+
   useEffect(() => {
     loadDrafts();
   }, []);
 
   useEffect(() => {
+    if (!location.state) {
+      return;
+    }
+
+    applyReviewToIntake(location.state, {
+      documentId: location.state.reviewContext?.documentId,
+      fileName: location.state.reviewContext?.fileName
+    });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state]);
+
+  useEffect(() => {
     if (mode === "create") {
+      setSourceMethod("paste");
       setWorkingDraft("");
       setComposeResult(null);
+      setReviewData(null);
+      setUploadedDocumentStatus(null);
+      setUploadedDocumentId("");
+      setUploadFile(null);
       setMessage("A blank draft workspace is ready. Add your requirements, then generate a first draft when you are ready.");
       setError("");
     }
   }, [mode]);
+
+  useEffect(() => {
+    if (!uploadedDocumentId || !uploadedDocumentStatus || !["QUEUED", "PROCESSING"].includes(uploadedDocumentStatus.status)) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      try {
+        const requestId = ++statusRequestIdRef.current;
+        const response = await client.get(`/documents/${uploadedDocumentId}`);
+        if (requestId !== statusRequestIdRef.current) {
+          return;
+        }
+        setUploadedDocumentStatus(response.data);
+      } catch {
+        // Keep the last known status visible.
+      }
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [uploadedDocumentId, uploadedDocumentStatus]);
 
   const handleLogout = () => {
     localStorage.removeItem("authToken");
@@ -107,7 +264,7 @@ export default function PolicyStudioPage() {
     setVersionHistory([]);
     setError("");
     setMessage(nextMode === "rewrite"
-      ? "Paste the current policy first. We will copy it into a new working draft so you can update without touching the original."
+      ? "Choose how you want to bring the current policy in. You can paste text or upload a PDF for review without leaving Policy Studio."
       : "Start from scratch selected. Your new policy draft will begin on a blank page.");
     if (nextMode === "rewrite") {
       setWorkingDraft(form.sourceText || "");
@@ -127,6 +284,115 @@ export default function PolicyStudioPage() {
     setComposeResult(null);
     setMessage("The existing policy has been copied into a new working draft. You can edit here before or after generation.");
     setError("");
+  };
+
+  const handlePolicyUpload = async () => {
+    setError("");
+    setMessage("");
+    setReviewData(null);
+
+    if (!uploadFile) {
+      setError("Choose a PDF policy file to review first.");
+      return;
+    }
+
+    if (!String(uploadFile.name || "").toLowerCase().endsWith(".pdf")) {
+      setError("Only PDF files are supported right now. Please choose a .pdf file.");
+      return;
+    }
+
+    if ((uploadFile.size || 0) > MAX_UPLOAD_SIZE_BYTES) {
+      setError(`"${uploadFile.name || "This file"}" is too large. Please choose a file under ${MAX_UPLOAD_SIZE_MB} MB.`);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", uploadFile);
+    const requestId = ++uploadRequestIdRef.current;
+
+    try {
+      setIsUploadingPolicy(true);
+      setUploadedDocumentStatus({
+        documentId: null,
+        fileName: uploadFile.name || "document",
+        status: "UPLOADING",
+        chunksStored: 0,
+        completedAt: null,
+        errorMessage: null
+      });
+      const response = await client.post("/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "X-Upload-Request-Id": `studio-upload-${Date.now()}-${requestId}`
+        }
+      });
+      if (requestId !== uploadRequestIdRef.current) {
+        return;
+      }
+      const data = response.data || {};
+      const nextDocumentId = data?.documentId ? String(data.documentId) : "";
+      setUploadedDocumentId(nextDocumentId);
+      setUploadedDocumentStatus({
+        documentId: data?.documentId ?? null,
+        fileName: data?.fileName || uploadFile.name || "document",
+        status: data?.status || "QUEUED",
+        chunksStored: data?.chunksStored ?? 0,
+        completedAt: null,
+        errorMessage: null
+      });
+      setMessage(`${data?.fileName || uploadFile.name || "Document"} is in the review pipeline. Once processing finishes, you can load the findings straight into the intake below.`);
+    } catch (err) {
+      if (requestId !== uploadRequestIdRef.current) {
+        return;
+      }
+      const detail = normalizeUploadErrorMessage(err.response?.status, err.response?.data?.error || err.message, uploadFile?.name);
+      setUploadedDocumentStatus({
+        documentId: null,
+        fileName: uploadFile?.name || "document",
+        status: "FAILED",
+        chunksStored: 0,
+        completedAt: null,
+        errorMessage: detail
+      });
+      setError(detail);
+    } finally {
+      if (requestId === uploadRequestIdRef.current) {
+        setIsUploadingPolicy(false);
+      }
+    }
+  };
+
+  const handleIntegratedReview = async () => {
+    setError("");
+    setMessage("");
+
+    if (!canRunIntegratedReview) {
+      setError("Finish processing the uploaded policy before running review.");
+      return;
+    }
+
+    try {
+      setIsReviewingPolicy(true);
+      const response = await client.get(`/documents/${uploadedDocumentId}/review`);
+      applyReviewToIntake(response.data, {
+        documentId: uploadedDocumentId,
+        fileName: uploadedDocumentStatus?.fileName
+      });
+    } catch (err) {
+      setError(err.response?.data?.error || "We could not review that policy right now. Please try again in a moment.");
+    } finally {
+      setIsReviewingPolicy(false);
+    }
+  };
+
+  const resetIntegratedUpload = () => {
+    setUploadFile(null);
+    setUploadedDocumentId("");
+    setUploadedDocumentStatus(null);
+    setReviewData(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleCompose = async () => {
@@ -218,6 +484,8 @@ export default function PolicyStudioPage() {
         additionalInstructions: form.additionalInstructions,
         sourceText: form.sourceText,
         workingDraft,
+        mustIncludeClauses: splitLines(form.mustIncludeClauses),
+        prohibitedClauses: splitLines(form.prohibitedClauses),
         summary: composeResult?.summary || "",
         rationale: composeResult?.rationale || "",
         confidence: composeResult?.confidence || "medium",
@@ -248,6 +516,11 @@ export default function PolicyStudioPage() {
       const draft = response.data;
       setCurrentDraftId(draft.draftId);
       setMode(draft.mode || "create");
+      setSourceMethod("paste");
+      setReviewData(null);
+      setUploadedDocumentStatus(null);
+      setUploadedDocumentId("");
+      setUploadFile(null);
       setForm({
         provider: draft.provider || "openai",
         policyType: draft.policyType || "",
@@ -258,8 +531,8 @@ export default function PolicyStudioPage() {
         goals: draft.goals || "",
         sourceText: draft.sourceText || "",
         additionalInstructions: draft.additionalInstructions || "",
-        mustIncludeClauses: joinLines(draft.keyChanges),
-        prohibitedClauses: joinLines(draft.riskFlags)
+        mustIncludeClauses: joinLines(draft.mustIncludeClauses),
+        prohibitedClauses: joinLines(draft.prohibitedClauses)
       });
       setWorkingDraft(draft.workingDraft || "");
       setComposeResult(draft);
@@ -311,7 +584,7 @@ export default function PolicyStudioPage() {
           <button type="button" className={`mode-card ${mode === "rewrite" ? "mode-card-active" : ""}`} onClick={() => handleModeSelect("rewrite")}>
             <span className="panel-note">Update Existing</span>
             <h2>Rewrite and improve an existing policy</h2>
-            <p>Paste the current policy, create a new working copy, and let PolicyMind rewrite it into a stronger publish-ready draft.</p>
+            <p>Bring in an existing policy by paste or PDF upload, then let PolicyMind turn it into a stronger publish-ready draft.</p>
           </button>
           <button type="button" className={`mode-card ${mode === "create" ? "mode-card-active" : ""}`} onClick={() => handleModeSelect("create")}>
             <span className="panel-note">Start New</span>
@@ -331,6 +604,96 @@ export default function PolicyStudioPage() {
                 <span className="panel-note">Required before drafting</span>
               </div>
               <div className="form policy-intake-form">
+                {importedReviewContext && (
+                  <div className="step-status-card step-status-warning">
+                    <div className="step-status-head">
+                      <strong>{importedReviewContext.fileName || "Uploaded policy review"}</strong>
+                      <span className="status-pill status-warning">Review Findings Loaded</span>
+                    </div>
+                    <p>
+                      Document ID {importedReviewContext.documentId || "N/A"} brought in {importedReviewContext.missingClauses?.length || 0} missing clauses and {importedReviewContext.riskyClauses?.length || 0} risky clauses.
+                    </p>
+                  </div>
+                )}
+
+                {isRewrite && (
+                  <div className="rewrite-source-shell">
+                    <div className="rewrite-source-head">
+                      <div>
+                        <p className="eyebrow">Existing Policy Intake</p>
+                        <h3>Choose how to bring the current policy in</h3>
+                      </div>
+                      <span className="panel-note">Stay in one workspace</span>
+                    </div>
+                    <div className="rewrite-source-toggle">
+                      <button type="button" className={`source-method-chip ${sourceMethod === "paste" ? "source-method-chip-active" : ""}`} onClick={() => setSourceMethod("paste")}>Paste Policy Text</button>
+                      <button type="button" className={`source-method-chip ${sourceMethod === "upload" ? "source-method-chip-active" : ""}`} onClick={() => setSourceMethod("upload")}>Upload PDF For Guided Review</button>
+                    </div>
+
+                    {sourceMethod === "upload" ? (
+                      <div className="rewrite-upload-panel">
+                        <label htmlFor="policyUpload">Existing policy PDF</label>
+                        <input
+                          ref={fileInputRef}
+                          id="policyUpload"
+                          type="file"
+                          accept=".pdf,application/pdf"
+                          onChange={(event) => {
+                            setUploadFile(event.target.files?.[0] || null);
+                            setError("");
+                            setMessage("");
+                          }}
+                        />
+                        <p className="muted">Upload a PDF, let PolicyMind review it, then pull the findings straight into this rewrite intake.</p>
+                        <div className="rewrite-upload-actions">
+                          <button type="button" onClick={handlePolicyUpload} disabled={isUploadingPolicy || !uploadFile}>
+                            {isUploadingPolicy ? "Uploading..." : "Upload Policy"}
+                          </button>
+                          <button type="button" className="secondary" onClick={handleIntegratedReview} disabled={!canRunIntegratedReview || isReviewingPolicy}>
+                            {isReviewingPolicy ? "Reviewing..." : "Run Review And Load Intake"}
+                          </button>
+                          <button type="button" className="secondary" onClick={resetIntegratedUpload} disabled={!uploadFile && !uploadedDocumentId && !reviewData}>
+                            Clear Upload
+                          </button>
+                        </div>
+                        {!!uploadedDocumentStatus && (
+                          <div className={`step-status-card step-status-${integratedStatusTone}`}>
+                            <div className="step-status-head">
+                              <strong>{uploadedDocumentStatus.fileName || uploadFile?.name || "Uploaded policy"}</strong>
+                              <span className={`status-pill status-${integratedStatusTone}`}>{uploadedDocumentStatus.status || "Waiting"}</span>
+                            </div>
+                            <p>
+                              {uploadedDocumentStatus.documentId
+                                ? `Document ID ${uploadedDocumentStatus.documentId} is ${String(uploadedDocumentStatus.status || "unknown").toLowerCase()}.`
+                                : "Your file is being prepared for review."}
+                            </p>
+                          </div>
+                        )}
+                        {!!reviewData && (
+                          <div className="review-summary-grid">
+                            <div className="metric-card">
+                              <strong>Assessment</strong>
+                              <span>{reviewSummary?.assessment || "Ready"}</span>
+                            </div>
+                            <div className="metric-card">
+                              <strong>Missing Clauses</strong>
+                              <span>{missingClauses.length}</span>
+                            </div>
+                            <div className="metric-card">
+                              <strong>Risky Clauses</strong>
+                              <span>{riskyClauses.length}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="rewrite-paste-panel">
+                        <p className="muted">Paste the current policy text directly when you already have it handy.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <label htmlFor="policyType">Policy type</label>
                 <input id="policyType" type="text" value={form.policyType} onChange={(e) => handleFieldChange("policyType", e.target.value)} placeholder="Example: Remote Work Policy" />
 
@@ -364,7 +727,7 @@ export default function PolicyStudioPage() {
                 {isRewrite && (
                   <>
                     <label htmlFor="sourceText">Existing policy text</label>
-                    <textarea id="sourceText" rows={10} value={form.sourceText} onChange={(e) => handleFieldChange("sourceText", e.target.value)} placeholder="Paste the current policy here. This remains the original source while we create a new working draft below." />
+                    <textarea id="sourceText" rows={10} value={form.sourceText} onChange={(e) => handleFieldChange("sourceText", e.target.value)} placeholder={sourceMethod === "upload" ? "Run a review above or paste edited source text here." : "Paste the current policy here. This remains the original source while we create a new working draft below."} />
                     <button type="button" className="secondary" onClick={loadSourceIntoDraft}>Copy Existing Policy Into New Draft</button>
                   </>
                 )}
@@ -393,7 +756,7 @@ export default function PolicyStudioPage() {
                 </div>
                 <span className="panel-note">{isRewrite ? "New draft created from existing policy" : "Blank canvas"}</span>
               </div>
-              <textarea className="policy-editor" value={workingDraft} onChange={(e) => setWorkingDraft(e.target.value)} placeholder={isRewrite ? "Paste the original policy above, then copy it into this working draft." : "Start your policy here or use the generator to create the first version."} rows={22} />
+              <textarea className="policy-editor" value={workingDraft} onChange={(e) => setWorkingDraft(e.target.value)} placeholder={isRewrite ? "Bring the source policy into intake above, then copy it into this working draft." : "Start your policy here or use the generator to create the first version."} rows={22} />
               <div className="policy-editor-actions">
                 <div className="draft-stats">
                   <span>{draftStats.words} words</span>
@@ -494,7 +857,7 @@ export default function PolicyStudioPage() {
                   <button key={draft.draftId} type="button" className={`draft-list-item ${draft.draftId === currentDraftId ? "draft-list-item-active" : ""}`} onClick={() => openDraft(draft.draftId)}>
                     <strong>{draft.title || draft.policyType}</strong>
                     <span>{draft.policyType}</span>
-                    <span>v{draft.currentVersionNumber || 1} · {draft.latestQualityScore ?? 0} score</span>
+                    <span>v{draft.currentVersionNumber || 1} - {draft.latestQualityScore ?? 0} score</span>
                   </button>
                 ))}
               </div>
@@ -527,3 +890,4 @@ export default function PolicyStudioPage() {
     </main>
   );
 }
+

@@ -29,17 +29,12 @@ import java.util.concurrent.TimeUnit;
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
-    private static final CacheControl NO_STORE = CacheControl.maxAge(0, TimeUnit.SECONDS)
-            .noCache()
-            .mustRevalidate()
-            .cachePrivate()
-            .noStore();
+    private static final CacheControl NO_STORE = CacheControl.maxAge(0, TimeUnit.SECONDS).noCache().mustRevalidate().cachePrivate().noStore();
 
     private final DocumentService documentService;
     private final AnalysisJobService analysisJobService;
 
-    public DocumentController(DocumentService documentService,
-                              AnalysisJobService analysisJobService) {
+    public DocumentController(DocumentService documentService, AnalysisJobService analysisJobService) {
         this.documentService = documentService;
         this.analysisJobService = analysisJobService;
     }
@@ -48,15 +43,9 @@ public class DocumentController {
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") MultipartFile file,
                                                       @RequestHeader(value = "X-Upload-Request-Id", required = false) String uploadRequestId,
                                                       HttpServletRequest request) {
-        logger.info(
-                "Upload request received, uploadRequestId='{}', path='{}', remoteAddr='{}', fileName='{}', contentType='{}', sizeBytes= {}",
-                uploadRequestId,
-                request == null ? null : request.getRequestURI(),
-                request == null ? null : request.getRemoteAddr(),
-                file == null ? null : file.getOriginalFilename(),
-                file == null ? null : file.getContentType(),
-                file == null ? null : file.getSize()
-        );
+        logger.info("Upload request received, uploadRequestId='{}', path='{}', remoteAddr='{}', fileName='{}', contentType='{}', sizeBytes= {}",
+                uploadRequestId, request == null ? null : request.getRequestURI(), request == null ? null : request.getRemoteAddr(),
+                file == null ? null : file.getOriginalFilename(), file == null ? null : file.getContentType(), file == null ? null : file.getSize());
         return noStore(HttpStatus.ACCEPTED, documentService.submitDocument(file));
     }
 
@@ -65,50 +54,29 @@ public class DocumentController {
         return noStore(HttpStatus.OK, documentService.getDocumentStatus(id));
     }
 
+    @GetMapping("/documents/{id}/review")
+    public ResponseEntity<Map<String, Object>> reviewDocument(@PathVariable Long id) {
+        return noStore(HttpStatus.OK, documentService.reviewDocument(id));
+    }
+
     @PostMapping("/{id}/ask")
-    public ResponseEntity<Map<String, Object>> askQuestion(
-            @PathVariable Long id,
-            @RequestBody(required = false) Map<String, Object> payload,
-            @RequestHeader(value = "X-Question-Request-Id", required = false) String questionRequestId,
-            @RequestParam(required = false) String question,
-            @RequestParam(required = false) String embeddingProvider,
-            @RequestParam(required = false) String answerProvider) {
-
+    public ResponseEntity<Map<String, Object>> askQuestion(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> payload,
+                                                           @RequestHeader(value = "X-Question-Request-Id", required = false) String questionRequestId,
+                                                           @RequestParam(required = false) String question, @RequestParam(required = false) String embeddingProvider,
+                                                           @RequestParam(required = false) String answerProvider) {
         String finalQuestion = question;
-        if (finalQuestion == null && payload != null && payload.get("question") != null) {
-            finalQuestion = payload.get("question").toString();
-        }
-
-        if (finalQuestion == null || finalQuestion.isBlank()) {
-            return noStore(HttpStatus.BAD_REQUEST, Map.of("error", "Question is required"));
-        }
-
-        logger.info(
-                "Question request received, questionRequestId='{}', documentId={}, embeddingProvider='{}', answerProvider='{}'",
-                questionRequestId,
-                id,
-                embeddingProvider,
-                answerProvider
-        );
-
+        if (finalQuestion == null && payload != null && payload.get("question") != null) finalQuestion = payload.get("question").toString();
+        if (finalQuestion == null || finalQuestion.isBlank()) return noStore(HttpStatus.BAD_REQUEST, Map.of("error", "Question is required"));
         String finalEmbeddingProvider = embeddingProvider;
-        if ((finalEmbeddingProvider == null || finalEmbeddingProvider.isBlank()) && payload != null && payload.get("embeddingProvider") != null) {
-            finalEmbeddingProvider = payload.get("embeddingProvider").toString();
-        }
-
+        if ((finalEmbeddingProvider == null || finalEmbeddingProvider.isBlank()) && payload != null && payload.get("embeddingProvider") != null) finalEmbeddingProvider = payload.get("embeddingProvider").toString();
         String finalAnswerProvider = answerProvider;
-        if ((finalAnswerProvider == null || finalAnswerProvider.isBlank()) && payload != null && payload.get("answerProvider") != null) {
-            finalAnswerProvider = payload.get("answerProvider").toString();
-        }
-
+        if ((finalAnswerProvider == null || finalAnswerProvider.isBlank()) && payload != null && payload.get("answerProvider") != null) finalAnswerProvider = payload.get("answerProvider").toString();
         return noStore(HttpStatus.OK, documentService.askQuestion(id, finalQuestion, finalEmbeddingProvider, finalAnswerProvider));
     }
 
     @PostMapping("/documents/{id}/analysis-jobs")
-    public ResponseEntity<Map<String, Object>> createAnalysisJob(@PathVariable Long id,
-                                                                 @RequestBody(required = false) AnalysisJobRequest request,
+    public ResponseEntity<Map<String, Object>> createAnalysisJob(@PathVariable Long id, @RequestBody(required = false) AnalysisJobRequest request,
                                                                  @RequestHeader(value = "X-Analysis-Request-Id", required = false) String analysisRequestId) {
-        logger.info("Analysis job request received, analysisRequestId='{}', documentId={}", analysisRequestId, id);
         return noStore(HttpStatus.ACCEPTED, analysisJobService.createQuestionAnswerJob(id, request == null ? new AnalysisJobRequest() : request));
     }
 
@@ -140,11 +108,6 @@ public class DocumentController {
     }
 
     private ResponseEntity<Map<String, Object>> noStore(HttpStatus status, Map<String, Object> body) {
-        return ResponseEntity.status(status)
-                .cacheControl(NO_STORE)
-                .header("Pragma", "no-cache")
-                .header("Expires", "0")
-                .header("Vary", "Authorization")
-                .body(body);
+        return ResponseEntity.status(status).cacheControl(NO_STORE).header("Pragma", "no-cache").header("Expires", "0").header("Vary", "Authorization").body(body);
     }
 }
