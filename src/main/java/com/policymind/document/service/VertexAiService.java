@@ -20,6 +20,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +43,7 @@ public class VertexAiService {
     public VertexAiService(@Value("${gcp.project-id:}") String projectId,
                            @Value("${gcp.location:us-central1}") String location,
                            @Value("${gcp.vertex.embedding-model:text-embedding-005}") String embeddingModel,
-                           @Value("${gcp.vertex.chat-model:gemini-2.0-flash-lite-001}") String chatModel,
+                           @Value("${gcp.vertex.chat-model:gemini-3.1-flash-lite}") String chatModel,
                            @Value("${gcp.bearer-token:}") String configuredBearerToken,
                            NetworkClientFactory networkClientFactory,
                            OutboundCallExecutor outboundCallExecutor,
@@ -138,7 +139,7 @@ public class VertexAiService {
                         "\nReturn JSON only. risk_score must be integer 1-10. confidence must be low|medium|high. " +
                         "key_risks and recommended_actions must be arrays of strings.";
 
-        String content = generateContent(prompt);
+        String content = generateContent(prompt, qnaResponseSchema());
         if (content == null || content.isBlank()) {
             return buildFallbackResponse(question, "vertex_empty_content");
         }
@@ -169,7 +170,8 @@ public class VertexAiService {
         String content = generateContent(
                 "You are a world-class enterprise policy drafting assistant. Return STRICT JSON with keys: title, summary, draft, rationale, key_changes, implementation_checklist, risk_flags, confidence, quality_score. The draft must be polished, practical, and publish-ready.\n" +
                         prompt +
-                        "\nReturn JSON only. quality_score must be integer 1-100. confidence must be low|medium|high. key_changes, implementation_checklist, and risk_flags must be arrays of strings."
+                        "\nReturn JSON only. quality_score must be integer 1-100. confidence must be low|medium|high. key_changes, implementation_checklist, and risk_flags must be arrays of strings.",
+                policyComposeResponseSchema()
         );
 
         if (content == null || content.isBlank()) {
@@ -201,7 +203,7 @@ public class VertexAiService {
         }
     }
 
-    private String generateContent(String prompt) {
+    private String generateContent(String prompt, Map<String, Object> responseSchema) {
         String url = String.format(
                 "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
                 location, projectId, location, chatModel
@@ -209,6 +211,8 @@ public class VertexAiService {
 
         Map<String, Object> generationConfig = new HashMap<>();
         generationConfig.put("temperature", 0.2);
+        generationConfig.put("responseMimeType", "application/json");
+        generationConfig.put("responseSchema", responseSchema);
 
         Map<String, Object> body = new HashMap<>();
         body.put("contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", prompt)))));
@@ -217,6 +221,54 @@ public class VertexAiService {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, buildHeaders());
         ResponseEntity<String> response = chatRestTemplate.postForEntity(url, request, String.class);
         return extractGeneratedText(response.getBody());
+    }
+
+    private Map<String, Object> qnaResponseSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("summary", vertexStringSchema());
+        properties.put("answer", vertexStringSchema());
+        properties.put("risk_score", Map.of("type", "INTEGER", "minimum", 1, "maximum", 10));
+        properties.put("confidence", vertexEnumSchema("low", "medium", "high"));
+        properties.put("key_risks", vertexStringArraySchema());
+        properties.put("recommended_actions", vertexStringArraySchema());
+
+        return vertexObjectSchema(properties, "summary", "answer", "risk_score", "confidence", "key_risks", "recommended_actions");
+    }
+
+    private Map<String, Object> policyComposeResponseSchema() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("title", vertexStringSchema());
+        properties.put("summary", vertexStringSchema());
+        properties.put("draft", vertexStringSchema());
+        properties.put("rationale", vertexStringSchema());
+        properties.put("key_changes", vertexStringArraySchema());
+        properties.put("implementation_checklist", vertexStringArraySchema());
+        properties.put("risk_flags", vertexStringArraySchema());
+        properties.put("confidence", vertexEnumSchema("low", "medium", "high"));
+        properties.put("quality_score", Map.of("type", "INTEGER", "minimum", 1, "maximum", 100));
+
+        return vertexObjectSchema(properties, "title", "summary", "draft", "rationale",
+                "key_changes", "implementation_checklist", "risk_flags", "confidence", "quality_score");
+    }
+
+    private Map<String, Object> vertexObjectSchema(Map<String, Object> properties, String... requiredFields) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "OBJECT");
+        schema.put("properties", properties);
+        schema.put("required", List.of(requiredFields));
+        return schema;
+    }
+
+    private Map<String, Object> vertexStringSchema() {
+        return Map.of("type", "STRING");
+    }
+
+    private Map<String, Object> vertexStringArraySchema() {
+        return Map.of("type", "ARRAY", "items", Map.of("type", "STRING"));
+    }
+
+    private Map<String, Object> vertexEnumSchema(String... values) {
+        return Map.of("type", "STRING", "enum", List.of(values));
     }
 
     private HttpHeaders buildHeaders() {

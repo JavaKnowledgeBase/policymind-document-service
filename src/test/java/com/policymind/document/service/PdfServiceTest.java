@@ -5,6 +5,7 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDStream;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -22,7 +23,7 @@ public class PdfServiceTest {
         doc.addPage(page);
         PDPageContentStream cs = new PDPageContentStream(doc, page);
         cs.beginText();
-        cs.setFont(PDType1Font.HELVETICA_BOLD, 12);
+        cs.setFont(new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD), 12);
         cs.newLineAtOffset(100, 700);
         cs.showText("Hello PDF Test");
         cs.endText();

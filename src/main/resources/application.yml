@@ -86,6 +86,7 @@ logging:
 
 openai:
   api-key: ${OPENAI_API_KEY}
+  chat-model: ${OPENAI_CHAT_MODEL:gpt-5.4-mini}
 
 ai:
   provider:
@@ -97,7 +98,7 @@ gcp:
   bearer-token: ${GCP_BEARER_TOKEN:}
   vertex:
     embedding-model: ${GCP_VERTEX_EMBEDDING_MODEL:text-embedding-005}
-    chat-model: ${GCP_VERTEX_CHAT_MODEL:gemini-2.0-flash-lite-001}
+    chat-model: ${GCP_VERTEX_CHAT_MODEL:gemini-3.1-flash-lite}
 
 app:
   oauth2:

@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,23 +29,34 @@ public class OpenAiService {
     private static final Logger logger = LoggerFactory.getLogger(OpenAiService.class);
 
     private final String apiKey;
+    private final String chatModel;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final OutboundCallExecutor outboundCallExecutor;
 
     @Autowired
     public OpenAiService(@Value("${openai.api.key}") String apiKey,
+                         @Value("${openai.chat-model:gpt-5.4-mini}") String chatModel,
                          NetworkClientFactory networkClientFactory,
                          OutboundCallExecutor outboundCallExecutor,
                          ObjectMapper objectMapper) {
-        this(apiKey, networkClientFactory.createRestTemplate("openai-chat"), outboundCallExecutor, objectMapper);
+        this(apiKey, chatModel, networkClientFactory.createRestTemplate("openai-chat"), outboundCallExecutor, objectMapper);
     }
 
     OpenAiService(String apiKey,
                   RestTemplate restTemplate,
                   OutboundCallExecutor outboundCallExecutor,
                   ObjectMapper objectMapper) {
+        this(apiKey, "gpt-5.4-mini", restTemplate, outboundCallExecutor, objectMapper);
+    }
+
+    OpenAiService(String apiKey,
+                  String chatModel,
+                  RestTemplate restTemplate,
+                  OutboundCallExecutor outboundCallExecutor,
+                  ObjectMapper objectMapper) {
         this.apiKey = apiKey;
+        this.chatModel = chatModel;
         this.restTemplate = restTemplate;
         this.outboundCallExecutor = outboundCallExecutor;
         this.objectMapper = objectMapper;
@@ -86,17 +98,17 @@ public class OpenAiService {
                 "\nQuestion:\n" + question +
                 "\nReturn JSON only. risk_score must be integer 1-10. confidence must be low|medium|high. key_risks and recommended_actions must be arrays of strings.";
 
-        return executeStructuredChat(systemPrompt, userPrompt, content -> normalizeStructuredOutput(content, question));
+        return executeStructuredChat(systemPrompt, userPrompt, qnaResponseFormat(), content -> normalizeStructuredOutput(content, question));
     }
 
     private String executePolicyCompose(String prompt, String mode, String policyType) {
         String systemPrompt = "You are a world-class enterprise policy drafting assistant. Return STRICT JSON with keys: title, summary, draft, rationale, key_changes, implementation_checklist, risk_flags, confidence, quality_score. The draft must be polished, practical, and publish-ready.";
         String userPrompt = prompt + "\nReturn JSON only. quality_score must be integer 1-100. confidence must be low|medium|high. key_changes, implementation_checklist, and risk_flags must be arrays of strings.";
 
-        return executeStructuredChat(systemPrompt, userPrompt, content -> normalizePolicyComposeOutput(content, mode, policyType));
+        return executeStructuredChat(systemPrompt, userPrompt, policyComposeResponseFormat(), content -> normalizePolicyComposeOutput(content, mode, policyType));
     }
 
-    private String executeStructuredChat(String systemPrompt, String userPrompt, StructuredResponseNormalizer normalizer) {
+    private String executeStructuredChat(String systemPrompt, String userPrompt, Map<String, Object> responseFormat, StructuredResponseNormalizer normalizer) {
         String url = "https://api.openai.com/v1/chat/completions";
 
         HttpHeaders headers = new HttpHeaders();
@@ -104,18 +116,77 @@ public class OpenAiService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> body = new HashMap<>();
-        body.put("model", "gpt-4o-mini");
+        body.put("model", chatModel);
         body.put("temperature", 0.2);
 
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", systemPrompt));
         messages.add(Map.of("role", "user", "content", userPrompt));
         body.put("messages", messages);
-        body.put("response_format", Map.of("type", "json_object"));
+        body.put("response_format", responseFormat);
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
         ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
         return normalizer.normalize(response.getBody());
+    }
+
+    private Map<String, Object> qnaResponseFormat() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("summary", stringSchema());
+        properties.put("answer", stringSchema());
+        properties.put("risk_score", Map.of("type", "integer", "minimum", 1, "maximum", 10));
+        properties.put("confidence", enumSchema("low", "medium", "high"));
+        properties.put("key_risks", stringArraySchema());
+        properties.put("recommended_actions", stringArraySchema());
+
+        Map<String, Object> schema = objectSchema(properties, "summary", "answer", "risk_score", "confidence", "key_risks", "recommended_actions");
+        return jsonSchemaResponseFormat("policy_qna_response", schema);
+    }
+
+    private Map<String, Object> policyComposeResponseFormat() {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("title", stringSchema());
+        properties.put("summary", stringSchema());
+        properties.put("draft", stringSchema());
+        properties.put("rationale", stringSchema());
+        properties.put("key_changes", stringArraySchema());
+        properties.put("implementation_checklist", stringArraySchema());
+        properties.put("risk_flags", stringArraySchema());
+        properties.put("confidence", enumSchema("low", "medium", "high"));
+        properties.put("quality_score", Map.of("type", "integer", "minimum", 1, "maximum", 100));
+
+        Map<String, Object> schema = objectSchema(properties, "title", "summary", "draft", "rationale",
+                "key_changes", "implementation_checklist", "risk_flags", "confidence", "quality_score");
+        return jsonSchemaResponseFormat("policy_compose_response", schema);
+    }
+
+    private Map<String, Object> jsonSchemaResponseFormat(String name, Map<String, Object> schema) {
+        Map<String, Object> jsonSchema = new LinkedHashMap<>();
+        jsonSchema.put("name", name);
+        jsonSchema.put("strict", true);
+        jsonSchema.put("schema", schema);
+        return Map.of("type", "json_schema", "json_schema", jsonSchema);
+    }
+
+    private Map<String, Object> objectSchema(Map<String, Object> properties, String... requiredFields) {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", properties);
+        schema.put("required", List.of(requiredFields));
+        schema.put("additionalProperties", false);
+        return schema;
+    }
+
+    private Map<String, Object> stringSchema() {
+        return Map.of("type", "string");
+    }
+
+    private Map<String, Object> stringArraySchema() {
+        return Map.of("type", "array", "items", Map.of("type", "string"));
+    }
+
+    private Map<String, Object> enumSchema(String... values) {
+        return Map.of("type", "string", "enum", List.of(values));
     }
 
     private String normalizeStructuredOutput(String openAiApiJson, String question) {

@@ -51,7 +51,7 @@ services:
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       GCP_LOCATION: ${GCP_LOCATION:-us-central1}
       GCP_VERTEX_EMBEDDING_MODEL: ${GCP_VERTEX_EMBEDDING_MODEL:-text-embedding-005}
-      GCP_VERTEX_CHAT_MODEL: ${GCP_VERTEX_CHAT_MODEL:-gemini-2.0-flash-lite-001}
+      GCP_VERTEX_CHAT_MODEL: ${GCP_VERTEX_CHAT_MODEL:-gemini-3.1-flash-lite}
       # Match the EC2 runtime so Vertex can use ADC from a mounted service-account file.
       GOOGLE_APPLICATION_CREDENTIALS: /app/secrets/policymind-ai-80ed72ade163.json
       GCP_BEARER_TOKEN: ${GCP_BEARER_TOKEN:-}
